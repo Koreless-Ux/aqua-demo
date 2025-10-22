@@ -1,0 +1,360 @@
+[
+  {
+    "id": 1761100073496,
+    "token": "j2526",
+    "cliente": "Maria Solis",
+    "ruta": "TV98",
+    "expira": 1761186473495,
+    "asistido": true,
+    "llegada": "2025-10-22T02:28:01.271Z"
+  },
+  {
+    "id": 1761100156023,
+    "token": "ey43vn",
+    "cliente": "dfyhgj",
+    "ruta": "tgyhujik",
+    "expira": 1761186556023,
+    "asistido": true,
+    "llegada": "2025-10-22T02:29:19.956Z"
+  },
+  {
+    "id": 1761105819100,
+    "token": "7lz6r",
+    "cliente": "Jorge Carrera",
+    "ruta": "TV5",
+    "productos": [
+      {
+        "nombre": "Paca de agua",
+        "cantidad": 500
+      },
+      {
+        "nombre": "Botellones",
+        "cantidad": 20
+      },
+      {
+        "nombre": "Fundas de Hielo",
+        "cantidad": 40
+      }
+    ],
+    "expira": 1761192219100,
+    "asistido": true,
+    "llegada": "2025-10-22T04:03:55.336Z"
+  },
+  {
+    "id": 1761106098334,
+    "token": "p5pkrq",
+    "cliente": "RONALD CRUZ MARÍN",
+    "ruta": "TV67",
+    "productos": [
+      {
+        "nombre": "FUNDA DE HIELO",
+        "cantidad": 15
+      },
+      {
+        "nombre": "PACA DE BOTELLAS",
+        "cantidad": 12
+      },
+      {
+        "nombre": "BOTELLONES",
+        "cantidad": 13
+      }
+    ],
+    "expira": 1761192498334,
+    "asistido": false,
+    "llegada": null
+  },
+  {
+    "id": 1761106370239,
+    "token": "a5ye0f",
+    "cliente": "RONALD CRUZ MARÍN",
+    "ruta": "TV5",
+    "productos": [
+      {
+        "nombre": "BOTELLONES",
+        "cantidad": 120
+      }
+    ],
+    "expira": 1761192770239,
+    "asistido": true,
+    "llegada": "2025-10-22T04:14:11.113Z"
+  },
+  {
+    "id": 1761106528351,
+    "token": "zqouui",
+    "cliente": "RONALD CRUZ MARÍN",
+    "ruta": "TV5697",
+    "productos": [
+      {
+        "nombre": "BOTELLONES",
+        "cantidad": 40
+      },
+      {
+        "nombre": "BOTELLAS",
+        "cantidad": 10
+      },
+      {
+        "nombre": "FUNDA DE HIELO",
+        "cantidad": 30
+      }
+    ],
+    "expira": 1761192928351,
+    "asistido": true,
+    "llegada": "2025-10-22T04:17:42.864Z"
+  },
+  {
+    "id": 1761106675702,
+    "token": "k5jwh9",
+    "cliente": "RONALD CRUZ MARÍN",
+    "ruta": "TV5697",
+    "productos": [
+      {
+        "nombre": "BOTELLONES",
+        "cantidad": 40
+      },
+      {
+        "nombre": "BOTELLAS",
+        "cantidad": 10
+      },
+      {
+        "nombre": "FUNDA DE HIELO",
+        "cantidad": 30
+      }
+    ],
+    "expira": 1761193075702,
+    "asistido": true,
+    "llegada": "2025-10-22T04:18:02.077Z"
+  },
+  {
+    "id": 1761106858530,
+    "token": "u2x02",
+    "cliente": "RONALD CRUZ MARÍN",
+    "ruta": "dfddf",
+    "productos": [
+      {
+        "nombre": "sdfdf",
+        "cantidad": 3
+      }
+    ],
+    "expira": 1761193258530,
+    "asistido": false,
+    "llegada": null
+  },
+  {
+    "id": 1761106872126,
+    "token": "zez4z",
+    "cliente": "RONALD CRUZ MARÍN",
+    "ruta": "TV 586",
+    "productos": [
+      {
+        "nombre": "sdfdf",
+        "cantidad": 3
+      }
+    ],
+    "expira": 1761193272126,
+    "asistido": true,
+    "llegada": "2025-10-22T04:21:23.019Z"
+  },
+  {
+    "id": 1761106936778,
+    "token": "lg05tn",
+    "cliente": "JORGE CARRERA MARÍN",
+    "ruta": "TV 586",
+    "productos": [
+      {
+        "nombre": "BOTELLONES",
+        "cantidad": 3
+      }
+    ],
+    "expira": 1761193336778,
+    "asistido": true,
+    "llegada": "2025-10-22T04:22:24.721Z"
+  },
+  {
+    "id": 1761107111484,
+    "token": "6meun7",
+    "cliente": "Jorge Carrera",
+    "ruta": "TV677889",
+    "productos": [
+      {
+        "nombre": "FUNDA DE HIELO",
+        "cantidad": 3
+      }
+    ],
+    "expira": 1761193511484,
+    "asistido": true,
+    "llegada": "2025-10-22T04:25:35.010Z"
+  },
+  {
+    "id": 1761107273705,
+    "token": "ew3zqs",
+    "cliente": "RONALD CRUZ MARÍN",
+    "ruta": "TV67",
+    "productos": [
+      {
+        "nombre": "FUNDA",
+        "cantidad": 2
+      }
+    ],
+    "expira": 1761193673705,
+    "asistido": true,
+    "llegada": "2025-10-22T04:28:09.469Z"
+  },
+  {
+    "id": 1761107398836,
+    "token": "g05e5yv",
+    "cliente": "RONALD CRUZ MARÍN",
+    "ruta": "TV5",
+    "productos": [
+      {
+        "nombre": "asd",
+        "cantidad": 1
+      }
+    ],
+    "expira": 1761193798836,
+    "asistido": true,
+    "llegada": "2025-10-22T04:30:07.026Z"
+  },
+  {
+    "id": 1761107489446,
+    "token": "yqcfwr",
+    "cliente": "asdasd",
+    "ruta": "asdasd",
+    "productos": [
+      {
+        "nombre": "asdasd",
+        "cantidad": 2
+      }
+    ],
+    "expira": 1761193889446,
+    "asistido": true,
+    "llegada": "2025-10-22T04:31:37.243Z"
+  },
+  {
+    "id": 1761107639357,
+    "token": "v4z35m",
+    "cliente": "RONALD CRUZ MARÍN",
+    "ruta": "TV67",
+    "productos": [
+      {
+        "nombre": "BOTELLONES",
+        "cantidad": 1150
+      }
+    ],
+    "expira": 1761194039357,
+    "asistido": true,
+    "llegada": "2025-10-22T04:34:06.379Z"
+  },
+  {
+    "id": 1761107691366,
+    "token": "29a6qe",
+    "cliente": "RONALD CRUZ MARÍN",
+    "ruta": "TV67SDD",
+    "productos": [
+      {
+        "nombre": "BOTELLONES",
+        "cantidad": 1150
+      }
+    ],
+    "expira": 1761194091366,
+    "asistido": true,
+    "llegada": "2025-10-22T04:34:59.271Z"
+  },
+  {
+    "id": 1761107806587,
+    "token": "3ce0pg",
+    "cliente": "RONALD CRUZ MARÍN",
+    "ruta": "TV5",
+    "productos": [
+      {
+        "nombre": "HIELO",
+        "cantidad": 20
+      }
+    ],
+    "expira": 1761194206587,
+    "asistido": true,
+    "llegada": "2025-10-22T04:36:53.044Z"
+  },
+  {
+    "id": 1761107902072,
+    "token": "h5rh9",
+    "cliente": "asdasd",
+    "ruta": "asdasd",
+    "productos": [
+      {
+        "nombre": "asdasd",
+        "cantidad": 2
+      }
+    ],
+    "expira": 1761194302072,
+    "asistido": true,
+    "llegada": "2025-10-22T04:38:29.988Z"
+  },
+  {
+    "id": 1761107946998,
+    "token": "bfeodc",
+    "cliente": "RONALD CRUZ MARÍN",
+    "ruta": "TV67",
+    "productos": [
+      {
+        "nombre": "HIELO",
+        "cantidad": 50
+      }
+    ],
+    "expira": 1761194346998,
+    "asistido": true,
+    "llegada": "2025-10-22T04:39:14.778Z"
+  },
+  {
+    "id": 1761108011810,
+    "token": "ojj6tg",
+    "cliente": "RONALD CRUZ MARÍN",
+    "ruta": "TV67",
+    "productos": [
+      {
+        "nombre": "BOTELLONES",
+        "cantidad": 140
+      },
+      {
+        "nombre": "FUNDA DE HIELO",
+        "cantidad": 12
+      },
+      {
+        "nombre": "BOTELLAS DE AGUA",
+        "cantidad": 300
+      }
+    ],
+    "expira": 1761194411810,
+    "asistido": true,
+    "llegada": "2025-10-22T04:40:27.946Z"
+  },
+  {
+    "id": 1761108169316,
+    "token": "f0146g",
+    "cliente": "SDFSDF",
+    "ruta": "SDFSDF",
+    "productos": [
+      {
+        "nombre": "DSFSDFSDF",
+        "cantidad": 3
+      }
+    ],
+    "expira": 1761194569316,
+    "asistido": false,
+    "llegada": null
+  },
+  {
+    "id": 1761108720804,
+    "token": "fm18nd",
+    "cliente": "Jorge Carrera",
+    "ruta": "TV67",
+    "productos": [
+      {
+        "nombre": "FUDNA",
+        "cantidad": 2
+      }
+    ],
+    "expira": 1761195120804,
+    "asistido": false,
+    "llegada": null
+  }
+]

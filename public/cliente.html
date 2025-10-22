@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cliente Aqua - QR de Asistencia</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 10px;
+      margin: 0;
+      background-color: #06381b;
+      color: #f3f3f3;
+    }
+    h1 {
+      color: #f0f1f1;
+      margin-bottom: 10px;
+    }
+    #logo {
+      display: block;
+      margin: 0 auto 20px auto;
+      max-width: 150px;
+      height: auto;
+      width: 100%;
+    }
+    #qrContainer {
+      position: relative;
+      display: inline-block;
+      margin: 20px 0;
+      background: rgb(7, 43, 22);
+      padding: 10px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    #qrCanvas {
+      border: 2px solid #e5eaeb;
+      border-radius: 5px;
+      max-width: 100%;
+      height: auto;
+      background: white;
+    }
+    #infoContainer {
+      background: rgb(255, 255, 255);
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin: 20px 0;
+      text-align: left;
+    }
+    #infoContainer h3 {
+      text-align: center;
+      color: #064113;
+      margin-top: 0;
+    }
+    #infoContainer p {
+      margin: 5px 0;
+      font-size: 16px;
+      color: #064113;
+    }
+    #status {
+      color: #f0f1f1;
+      margin: 10px 0;
+      font-weight: bold;
+    }
+    #errorMsg {
+      color: white;
+      background: red;
+      display: none;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+    .loading {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    #detallesEntrega {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 10px;
+      border-radius: 5px;
+      margin: 10px 0;
+      text-align: left;
+    }
+    #detallesEntrega h4 {
+      color: #f0f1f1;
+      margin: 0 0 10px 0;
+      text-align: center;
+    }
+    #detallesEntrega ul {
+      list-style: none;
+      padding: 0;
+      color: #f0f1f1;
+    }
+    #detallesEntrega li {
+      margin: 5px 0;
+      padding: 5px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+    #detallesError {
+      color: #ffcccb;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Reemplaza con tu base64 del logo -->
+  <img id="logo" src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gKgSUNDX1BST0ZJTEUAAQEAAAKQbGNtcwQwAABtbnRyUkdCIFhZWiAAAAAAAAAAAAAAAABhY3NwQVBQTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA9tYAAQAAAADTLWxjbXMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAtkZXNjAAABCAAAADhjcHJ0AAABQAAAAE53dHB0AAABkAAAABRjaGFkAAABpAAAACxyWFlaAAAB0AAAABRiWFlaAAAB5AAAABRnWFlaAAAB+AAAABRyVFJDAAACDAAAACBnVFJDAAACLAAAACBiVFJDAAACTAAAACBjaHJtAAACbAAAACRtbHVjAAAAAAAAAAEAAAAMZW5VUwAAABwAAAAcAHMAUgBHAEIAIABiAHUAaQBsAHQALQBpAG4AAG1sdWMAAAAAAAAAAQAAAAxlblVTAAAAMgAAABwATgBvACAAYwBvAHAAeQByAGkAZwBoAHQALAAgAHUAcwBlACAAZgByAGUAZQBsAHkAAAAAWFlaIAAAAAAAAPbWAAEAAAAA0y1zZjMyAAAAAAABDEoAAAXj///zKgAAB5sAAP2H///7ov///aMAAAPYAADAlFhZWiAAAAAAAABvlAAAOO4AAAOQWFlaIAAAAAAAACSdAAAPgwAAtr5YWVogAAAAAAAAYqUAALeQAAAY3nBhcmEAAAAAAAMAAAACZmYAAPKnAAANWQAAE9AAAApbcGFyYQAAAAAAAwAAAAJmZgAA8qcAAA1ZAAAT0AAACltwYXJhAAAAAAADAAAAAmZmAADypwAADVkAABPQAAAKW2Nocm0AAAAAAAMAAAAAo9cAAFR7AABMzQAAmZoAACZmAAAPXP/bAEMABQMEBAQDBQQEBAUFBQYHDAgHBwcHDwsLCQwRDxISEQ8RERMWHBcTFBoVEREYIRgaHR0fHx8TFyIkIh4kHB4fHv/bAEMBBQUFBwYHDggIDh4UERQeHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHv/CABEIAZABkAMBIgACEQEDEQH/xAAcAAEAAgIDAQAAAAAAAAAAAAAABgcFCAIDBAH/xAAYAQEAAwEAAAAAAAAAAAAAAAAAAQIDBP/aAAwDAQACEAMQAAABrsW5QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADIk44IAAAAAAAAAAAAAAAAAAAAAAFipmiYK76rLFrq2AIAAAAAAAAAAAAAAAAAAAAH0zGw+Bk9dwX82vGyEYU19cuNsAAAAAAAAAAAAAAAAAAAAFlwvYqNPQcI2wyl05bCOHONahrTaHXWccQJzAAAAAAAAAAAAAAAAAAE9TP5aV6FZzTXWadAnG3LN1d2KjbMRGXIvqsnsCtzggAAAAAAAAAAAAAAAAD2bHQmxY2fPsDi8AiJbnBCXREnaj7A55Xo8GuOztdTSmxOIAAAAAAAAAAAAAAACQx7YFeS8yu/k1xnNbTiE55H7c6NKGE55DY7WGyY0uDhzRtrxHdgtfbc4KgAAAAAAAAAAAAADsJtd+Iy9ehgc9QhFOBbnWNEdiI09IjanK52g13nHD8+Cc9i89Qd+V6FIXfiDW12dducAAAAAAAAAAAAABZNe7JRfIHCN4hRGewNud9+WKidSor0GFGaisqGq/wAsaubc696Izydi3DnXop+ttmdbZx6BOYAAAAAAAAAAAA7SyLcx2Rr0IFOtckYYWwyOxsQnVd3HlXK0FRZbn2n5V1Ytejya5bMQWa0gJwuye637G1351HbmOTrO7eq3OAAAAAAAAAAAAsKvdiYvIBG8DpKQx63OlkV2JTnhXfHa5TKBTgE09Wx2s89i92CN6Ciexeu04cbtpKQzGxAr0UxXuxGu84BNAAAAAAAAAAAJFsPWNnRui8opeJr47rc8+uXG5KvQi8m17RHfjtthnF1o11zdvVOWwMo152Ervypq5canWh3dNufYKT0vdFehrvsRWKKkFsAAAAAAAAAAB6jYLO/Ptenr1lvfX2c1l1xsmrkjhG8IpDNYW3Ot6EX/ABbmI2rOotpqAnGMXfSGamux7hzr0VDWmy+tk4d+zWrWwS0nwWd+Rpqu9XltzAAAAAAAAAAJHHJSnYAV6a4p22amthPrrisqrqgs616RG+zrs+2M9zpXoIwRJ8FnSdWuuz6wtz3fOtetha7KUuuKpoC4qdtmcrQEb68xyVRW3MCAAAAAAAAAEhj3qTs++fa9Nc1XeNbTjeHIjbAa62rVU4ZHY+B2LGjr7K0Wr5glufaXsrSy69Hm1w2Yrqa03sVrrarO1OPJG+s1qRKyZxlJ8jbXiPery25gQAAAAAAAAABsfmq0suvR01jamFM0FqLj0kkc4WV2Eb+LW+xqtnEJz9myOsVpRpa/X2I21qkMmjk4XiI3quzsXmlWFzVaFQi3OAAAAAAAAAABn9idV71jWaCNQKrsHs96rp7oYmlfGW5gHs8Y2j7oXNK9ONr21MejIBYD5rta1FTkE5AAAAAAAAAAAMzhidofRS90V3BYBXthYhXW1y425wByLlsLEZevQCwDz+il1Ythy3OAAAAAAAAAAAAAteqCdqVQ21XfsCwFaVFtRG5z16WkZ1dbsnkjQI0AOupVfXVJbAEAAAAAAAAAAAAAAJLGidis/qxOI0u9FZRGnIJAAOMXRKsBV8HnORxonMEAAAAAAAAAAAAAAAAAPb4hNMzWRa2lSomzcNC0x7fEKgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf/EACoQAAEDAwMEAgIDAQEAAAAAAAQCAwUBBhAAExQVIEBQERIhMSUzNYAw/9oACAEBAAEFAv8AhKNDdOMkhHQTPX/vVsRfTw7ni+oB+vs6L3nsXjF7LvrYcByROHabYZwQ02+zMAORxvq00qpVuxtI4HsuKNpIgqpVKvVWZGbjmJk9EcDDHokQsXnGbbnqYgFcgcw0hhnSq0Sm4pKsidbslWOOTWik6faQ8zLgrjzvUWzG9PBxecntt4syT3G8XNGdQB9PZ8bySsSxrceC+64+9gd1xh6JNbkAcXhG8Yr0oQ7hZQIzYYmLokued2WvJcA7BwzZgho7ghXpLNjdgfF3yXEE7rQkuWJi843fH9Hb8fWRkE0ommi32xh5Epw0zEaG6cZJBugmYjinAjBH2yRtKpRVLgj6x8h6K3I/p8fi9JHcdx+9WxF9PDueL6gH+s2VI7b2Ljj+oR3obPj+UdicPTHR61KWvFnRe87i8YvZdwhSkLgz0yEfi8I/inee0hTrkSGkAHF0yHOkMQ4LkgcO02wzghpD7MwA5HG4taQ4MhiWDSeA6hTTnnWSBuP4uuQ4UdilK1rbkbSOB7Ljjeog1pWlcWrIc2OxewH0f80dpb78eMgMPSq0TSeOrISOLNjN57EwciPBhzkSIOLyjNl7ECdWPkU1opOpAZBgZDS2H/MscH7O4vE/jA4jRHDjRWWxh9VrSlLkkuonW3JVjjqVpWmimGyR5IRwEzFmn8kHF8A/Vzy2W1OuxwyAwtKrRKZk2p8ji0Y3iB4vKT2B8WbJ74+LujeWFiFNqBIprRSdSIyDAnm1NO+VZIW6bi8juNHYteO58hiQKbCDLIcKJwI+4KTHlNmB4uiO4B+LNO5Mfi9gto3yrfD4UXi4TedKaSmq1QYCY6PxeMjyS+yzpLjF4nAEyMepNUK1bxvBlMXAHzYrybcE5kvi5jOHE4suP3isXHIdPjq/nEBHKkjp+OVHHa/WrbkOoR+L0j9knFsmcyJxcYvDl/IsQb4Yxe5e7IaYaW+9HCoCC1Wvxq4pDqEjpltbzsLHojgpqPRIgvNrZd1bsh0+Rp+aakRUGhPtLZe1ZBe1IYvsb5Y8iBY40RpaqIQY9UkvVjg/d7F4SHFAxZsXtN4vKL3W8WfIcoDF7g/R7Qb1Ri21UWjU8xyYjxw294v9Yud/YhNNIU67HCpDC0qtEpmzanyOrcjayJ1KUpTFaUVS443px2oQ2oEimtFJ1JDJMBdQppzVsP78JqujG9kvxrZRRydxfi/gDVlB70hi8juNHabQpxyFARHAdk0AiRBcQptzVnHcmOxeoezIasNfyBi5kUbnfGtP/fxf39WrXE4sPi5DObLasqO+VYuORpHAW5I0kQMXrHfCtW2ZwpbF0CcuH1YP9WLs/wB/xrbXtzmL8T/HxzFSj6U+KanyuHFajRFmmjNIHY0tSUInD1SJ8GeqOPQpK0aJZQQxJCLCN1AFcyJ1WnzSRY4p9hp/jsXIvcnPGDc2S8XSzvQdlM7kzi/X/wAasoDZExesjts4sqR3GcXoBvCasJ/8YvVnbmbVZ2YPBjm8X48I/wAmJ06hLjVmD1YkcXquqpuKEUdINpShGjH0CjGkOFlYCIcEKDfQULpxKVolRKgyFlrqmbxeY9X5FpCW2tTb/GifIsUr7DYZF2pbF7N/WasYP6s4vg7tsc7N9B/ZmyUfaZw8Luy2L6K+o3kQBnBlO2/B611GD0Ej9PLS00cQsovsBIWIWytLrWpMehcfYY/x3T5nOlPJtOQ5kd2GjIKZxeJGzC91nEb0NgIZArPZdkhw47yoY5cecw4h5nuvpNaxfdYqa0i+59xDLUwcuQO8u0pfiud0uLzY5aaoV2JTVaocThR3ddsvyXPNtac+ad10wdX1VpWlcU/NbWg1MK7rpnPinn29cNWqIUlSe2ThgT9PWjX5ZtGvzGQwIHcpSUpuG4qu+ih5kqOrGSocgn/0lJUOPTMTJUjX0aa1SqNuYwfQM9GlapWlad1a0pQ6ejRdSVzGEaVWqlenGLKGqPc0o3pu7naapdzWq3c1py7nq6IuaUc0SWUT/wAIf//EACQRAAIDAAEEAgMBAQAAAAAAAAECABARIQMSMEAxQSAiUVBg/9oACAEDAQE/Af8AlgNmcZCM9dVymXfWQfdd/NOPUA2AZHakMI2EZ6aDITkJ2gcgOxx6SjTTmuzikNMMPoqMEY4KRadaU6Iw0eggpjpgGwcTYYRkU4acedRgjnKQZCcm87AdjjaQ6Iw0eZBzTHTEGmnO0hynGRThpxh8qDiMcFKMEY4K7OKU6Iw0Up0Rxx5upEFMdMRfunX7inDTjmdPyj5p/mKMEc4IBtbzlEZEOiMNET5o/PjFMP2pzzEGQnJsB2OIh5pR+1HyKdEIrNanNIazGoDmMcHl6Z+rznYbEEzm+ofrzKdsjj8F+LJzzg5Adtk2dhipZOQnfQ2B/wCzfw2Hqfz1e4zvM7j/AL3/xAAcEQEAAgMBAQEAAAAAAAAAAAABEEAAESAwUHD/2gAIAQIBAT8B/B2NQWGq9FQjcNZgpvkUDoovJDyer1vo9jGWCTH3PBhomPBjVIaT6Hy95vN1ddara+//AP/EAEAQAAIBAAYHAwgIBgMBAAAAAAECAwAEEBEhIhIjMUFRYXEUIMEyQEJQUnKRoRMVQ2KBgtHhBSQzU7HwgJKyMP/aAAgBAQAGPwL/AIJJVotrbTwHGj1aXauw8Rx9Y6cg/mJcW5cqacY/mIsV58vWHb5l1aHVg7zxt7fCurc6wDcePq5YEwXa7cBRIYl0UQXAWtDKukji4ijQNiu1G4j1YFUXk7BQK39Z8ZD4d0qv9ZMYz4UKsLiNo9V/WEy5VwiB3nja07YtsReJos64NsdeBt+sIVythLduPH1UlXS+7a7cBRYoxooguAsLE3AbaFlOpTCMeNAzE/QvhIPGgZTeDssaKRdJGFxFHq73kbUbiPVILjXy4vy5W/V8LZnxlI3Dhb9XzNmTGMneOFt6DXxYpz5eqO2SrqoTl5ta9YfaMFHE0eaVtJ3N5NqTRNouhvBolYTfgw4G3tkS6qY5uTepo6vEL2c3Ujq0XkoPjboxtqIsF58+7oSHUS4Ny52yVeXyXHwpJV5Rc6G71L26VdZKMnJbeyxHXTD4L3+zSm+aH5rb26JdZEM/NfUixkapc0h5UuAuAseeU3IgvNJKzJtY7OAtSrRbW2ngONHq0u1dh4jjbHWY9qnZxHCiTxG9HF4suOINGjA1TZozy9RqrDXSZpP0tH8PibKmMnM8Lbqacg/mJcW5cqacY/mIsV58qY2n+HytlfGPkeFrKo10eaP9PUXaZBqoMerWvN6ZwQcTQuxvZjeTb2+ddXGdWDvPG3t8K6tzrANx42h1NzKbwaJN6exxwNvaYxqp/k3qBY0F7MbgKR1ZdwzHibSqHUw5V58TasC4LtduAokUa6KILgLXilXSRxcRRqu+K7UbiLQrnUy5W5cDbJVm2nyTwNGjcXMpuI8/avyDLHlTraUQ66bKvIbzbcBeTS5xrpMX/Tu3KNfHih8KXEXEWhHOuhytzG42rX4xlkyydfPkhjF7ubhSOrR7EF3Wwkm4CjzfZjLH0t7fKurjOrv3txtasNidiLxNErC4NsdeBt7fEurkOsu3NxtSb7M5ZByoCDeDZLVpNji7pR4ZBc6NcfPXr7jBckfXfb2WM6yfbyW2OrR+kcTwHGiQRC5EFwsvNDoHUR4R8+dM51EmEnLnS8bLHglF6OLjSSrSbVOB4jjb2ZzrINnNbUr6Dy8snXd54kSC9nNwpFVk2It3U2FmNwG2klY9HYg4Lb2iVddNj0W3sMTayUZ+S29hmbWRDJzW3tEa66HHqtsdY9HY/NaBgbwdlktWfY63dDR4nFzIbj521bYZYcF9429nQ6yfD8u+0FxqYsz8+AtkrMmxBs48qSViU3u5vNsdYiNzobxSOsx7HGzhytJRdTLmTlxFvZ3Osgw/LutWtqMswub3h53FERnI0n6m2SQHVrkToLAqi9ibgKJD6ZzOeJt7JGdVCcebd3skraqY4cmteH0xmQ86FWFzDAiyOQm6Nsj9DbLEBnA0k6jzqFCMinTfoLZGBzyZE/G016QZIsE5tazKddJlj/Wl5sCY/RLjIeVDH9k2MZ5WX0VmOujyyfraK9GMkuD8mtjYnPHkf8LZowMjHTXofOZ62Rix0FtSqqcsK49T/osSGMXu5uFIqsmxB8TazqdUmWPpxsWKNdJ2NwFFhXFji7cTRoWwbajcDRopF0XU3EWK7HVPlk6cbZKs+xx8DR4ZBc6G42PVWOWZcOotgrYGKnQbzmrRfcvPU42M7G4KLzSWdtsjFrHr7jBMsfXfb2eM62fDou+36wmXO41QO4cbfrCFc6f1QN4429nkOtgw6rutSvoMHyydd1kU67Y2DUV1N4YXiysxb9C8dRj5xDD7bhfnbWGBuLDQH42LGgvZjcKRVZPQX4mwsTcBtpJP6GxB92wBhqI8ZP0pcBcBaQcQaEJ/Qkxj/SyOf0Njj7tAym8GyWrP6Y+B3UaNxcym4iyrsTeVGgfwtmh9hyvz83qoPtX/AAFsEfGW/wCX72GtMMsAw9429nQ6yfD8u+xY0GkzG4CiQDy9rnie60B8vah4GjRuLmU3EWdnc6yDD8u61a0oyzjH3hZPHwlv+X7W1oD2r/iL/N6t+b/ybap7zeFkV4zyaxvx/a2VgdWmROgsP8RlXAZYvE2ll/rSZY/1oGY65Msg8bR/EYhtyy+BsicnVvkfobZbhnj1i/h+1lb95fG2s/l/8jzeqt9/R+OFsD8JbvlSCr3eW4B6b6XDZZPMDmu0V6myOrR7XOJ4CiQxi5EFwsLsblUXk0ab7MZYxyos32ZyyDiKB1N6sLwbHhkF6OLjSSrSbVOB4iyCY+Vdot1Flx2Unq93kOQOm6k78ZbvlbWmHt6Pww83hl9hw3ztrAAvK3P8KfSf2oy3h421aqjm5/wPGw11xnm8nktoqETZpMZOnC01CU5o8Y+nC0V1Bnhwb3bKzVTycf4Phb9J/djDeHhSrgi4te/xtml9ty3z84q03FAD1GBsaNvJYXGlfjfyork+ZtK+xGo8fGkVWHpHMeA30VFFyqLgLJKxKcqC80krEpzOb7Y6xF5SG+kdYiN6uLxYyML1YXEUlqx9E5TxG6gX242Hj4W1CNPKlyfOixr5Ki4WVmXghA6nAeczVRjih0l6H/fnbNWV2TRjS6i3S9uMHwpLXWGL5E6b/wDeVqVCNvvyeA7r/wAPkb78fiLYq6oxTI/Td/vOml7EZPhbDWWGEMZ0epthqgOLnSboP9+XnMUxOQ5X6HvVasjnGfDxpBVwLtBMeu+x5XwVBeaS1h9rtf3Yqwm1GvokqeS4vFk9XIv00w67qVmsnlGPHw70swOQZU6DzoROdbBlPMbj3RG+51b4G1lG2Vgnj4d9VO2Jinj42mNN7s3xPdMSHWz5RyG8+dpWFxXY68RRZY2DIwvB78TD0Zcfge/Kx9KXD4DvtLIwVFF5NHrDYLsQcB552KsNqXOQn0T35qtvYZeu6hVhcwNxHdCqL2JuApDVt6rm67+/2KrtqUOcj0j+nny1GuvjsjkP+D3zXamt8n2iD0uYpcdttwxNFrtcXWfZp7PM99qjUnx2SSDdyHqBarX2vTYsvDrQMpBB2Ed7Sli0ZP7iYGmpruHBkprq7hwVKaUUWlJ7b4nvFmIAG0mjVWoMQnpS8enqLRU/SQ74z4U1L3Sb428r/wCuue+TdGvlU0WP0cO6NfHj6kDKSCNhFAlYHaU5+V8aAfTfRP7MmH7UvBvHfvOAoR9N9M/sx4/tQpVx2dOWLfGhZiSTtJ9UaisSR+61M7Rze+n6U1lSRuj3UxqT/wDemFSf/vTV1JF6vfTI0cPuJ+tNfWJJPeb/AIIf/8QAKxABAAECBAUEAwEBAQEAAAAAAREhMQAQQYFRYXGRsaHB0fAgQFDh8YAw/9oACAEBAAE/If8AwkCtTkaywKrJyNIf0AUAStjAWGHJ6fPngILA8nr8eeERRITT+fDaLCntjz0z4OkD/mfPX+dON7i3rgSAAtDMVDDtTEx/sLev8xYCoAquBwGPnNOg+fxPAJ+c16H4wsBUIVH+Xrk4Dq7fPTOGf2d7Y/3vF7Z65+AdDf56/wAqCA6DTu/dcFPBNoZCiFKWgYRAT8pr1PxjsYHNOo+cDAFKGiZFuSdqOIMDUa9n7r/IJWAlwNB45fTb5nPR9SHR3eOuegalOrs8dM5i/OU13+YwiMJCfx7+qQ7fa/bNQhCrv2PumHYIu45qwBNxxCENzt3PumcfApBbX737/wAajWdy4uxXBgRE6tXdycMsx2Oz1+9PxhILk9np8+WDIwpiTxaOzirWNz4O5X+LMwIQTe38RnaSoUvru9u/522mBb6btbtnAyoQDe28T/EYl/mm9sATAgAoGUh+09uuFZ03YGxmSlS3TWWCcqW6aQzVHXdxuMQDbT265KTAQjZMK676abW/hAqAKumD1SLg6bPM530Ocejs89MwUAlbGKAIDk9PnzwNgDyevx54RSBEuOd0LnXq7vPXM9Qi4uu74wiMJCafwb50BJTRNr9s6Ab21bdr7YUWwi6ufBwAf8x56Z8HyB/zPnrmosgFxMUEh6Zv3vvnbKysW1Te/f8AgLfPNqtsQ0rMevdzqrzQ2X02M5V9gd3AlgDaGY1EHamJDPYG+2dFeOWy+mznDKDPD7P3ScLffdol/wB/nkjqyrsPryzojywX+gb5gnIgDVwYBSfhw2+Z/E0FU47jv8xhm5EI3M688Ml/oG2fLpDQlHc8fvRvjPm4GzXuLV3ZchLAlXQwJlsHA/N98+EoAfYeemfr6o7GIYdQW7nv0ztqgAfY+euauXcD+L7YEMCRLJkFGvcWjsw4n/EfM/d5lacV3am7nGwZiDXV7275ijXzFhGdsvfrkgQAqrph5BVL1b/EYMSUS9G3xOCSCqia5TH7D364Nn4BZpWfSk10e1u2dF8hFwXdqbH7kHJT4qxjVIR7juzkeAUp0MNpZvLFvnfO1wSq+kb37cM4CFIQ14W/ieOchImNa8LbxGd6wtF9Y2v345hpYsXEv89TB4hSiyZaIKPYdmMSclPgjD+3a+Op8BPczgIqyhqD3W3c6g8cll7ngcGTg3nM03ONrmZy6Ge/zM5dHDI3nEtdjk4orTwWXseEzuNWMtVey2xn6X2PkI7P7YR5ZUN70obZtPi+6bsu+TXigXVxSDvJv2ttnDz6qb/a3f8AGxSqttPvbtnAE2kbd7b4a81RcTTJpeN3c2YdsGRTbZVb3rU3/akMfVRXqwb50Ou9XOxLnWhep3Nj1TPhxFwddnxhKUVbrkowU/pwdXAqF6/4OpbIVAUSyYHRIuLpu8znSZeh3Nz1HOp13qx3Ic5QCyeZ6Mm37J0ibPAq+qds5gKo73jyygJyfNxpgle47uQBWgXXCaOdye5r2yW0EbVcRdfVvTTEGQ/d6YUUk7RMkXLdzexr3wgERG0ZaY4HsOziZnJ8zKYSoO94n0zniltyanqPf9nipHvDzlPwROAYniuTSW2XNTLjKu1N87CZJl9Rvbdz4KoD7nx1z0FEA+o8dM7mYK2uo2tsZ6Z7FwlXam2U8Viaw2xDwROI5c1DtDx+wLlu/AwAICAyYTG3EPpOUMxz4rQxa8iXcXdnIcQpTYMS7auWFvnfJ2VBuPDd4nBMwIAsZmWAhEo4cw1G4cdniMpdtUbVX+dsHgFIjRMrOEY7i2YxLefhko5MJLciUHpGQEhJHEOfHI/XEOQW9E8Z1C+KslbrpDQPSfTOwJWlqD3UN3JsYxtVtiINVPr320/GIwFft/GG5vO0S+V4K3tVfRsZ0stooPpHrlWb5ozGHAjeC8/tYFn09nJFIB9h4ZvIy+Yd2XLXqATX6HfNQCsHB12fGBAd8abvnO1nETj9Dtk8AL7xsw5xGUfceWQZtPZ/aAC1r6B92csT5y+MGBJEOartOCIABAGVFDXY0DtfbKh95APbEN+T5GRq2EWA1xOZKh0Pu3xXM0Tq+5fBiyAWR1ykryfJxU+8IHtlKGddnQe998iYBRCOuHQQTDmq7RiOB8YfOY2oegPZ+uC9uzBwVMmiHhykK9pwEzQurHuZ1Yu5MUa6XKvu+DOzRSGmnd4652Latrr2eHlnXv3lvs+XKrFnNgImpdT/AAwkZ9OclHtGTQlwQtu/J/YEBVlH0JHI15WXJIwWV4p9LZqixPrgnFDpjVdsC2AFoFsoaD+dy3xKUnuXA2KZqVEdz4m5TEMB+Vy2yFuwrUb4rynXGq7YNFmfTMLq8Oz5wa8DLkEZCyowj6Ep+zNrRzuRuZo7U3q49ROzn9L9fZibcSTku75qtsiF7nnt+Ne8XXsee+cn8khxXd8Pr/p7s7Nm9XHoD3zm3o42J3f2U/Q1/wC0UdsFfxILNfIwGEgHqLvOSkSL8AJcI2zuk0Nin4oWxuo1NymFIkL8RJMjCSD1F3jCAsV8j8RoS4nyWv8A2mrv+1WTInv8JTb8beYLE1B9o3zRsgyOF3pDf82fK8nhZ6Q2zt5osRKj7xt+IQmTxfhKb/tysbm7nvgdQjan5nEoPRP5hpIL1R+YvoStDE7Gxex77/uCEOsVH06Pnf8AOv0V7lr6jCX2kXE/FrxQLq6Y1MrnPX1P5i0usVD06PO37wxQKrf7UfzobWbr3HLXrdACBhHTMIApQDXEKeMrf3HLTrb8hmxVXdzuL/AcHdVXl4jngEbSiRPyRZHqd3R3xLIcFUbj7Yj0OKqd1wiQP/J0NvyJO0ogDBCZoVHl4Dn/AAidRymh1aODbHcAPnb/AOqto2oXxvhfUMoo9Wr+IsFpRCYLCGkuCeW+DQLfW/LBoyWRo/m7cCqrbBqRPrflgMJ6S5Dw2wsFpRK/yDTFswgdrOFaNwg9mPWqvMcaadC+2NdOpPbHrFXiGFaNwk92FFm2YRDa3/hD/9oADAMBAAIAAwAAABAMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMwMMMMMMMMMMMMMMMMMMMMMMNUukMMMMMMMMMMMMMMMMMMMMMdLwoMMMMMMMMMMMMMMMMMMMMNLjHQIMMMMMMMMMMMMMMMMMMNVwgOVikMMMMMMMMMMMMMMMMMMFAAMDAEMMMMMMMMMMMMMMMMNzwoeMsbwUMMMMMMMMMMMMMMMcYoMbw4MoIsMMMMMMMMMMMMMN/iEUzCgEHw4MMMMMMMMMMMMMM8IP6wFDQMI8MMMMMMMMMMMMMLyEhwMOOyZHQsMMMMMMMMMMMMRocP8AHRb/ABy0ngwwwwwwwwwwx9aG+KT/AC1XS8ZksMMMMMMMMMNXyhq4W0NgF84byEMMMMMMMMMNTzfysq5BowewvyoMMMMMMMMMMP3PzdyoMazvz/8ADDDDDDDDDDDDU88zQjDT8X88oDDDDDDDDDDDDC688HLDH1883jDDDDDDDDDDDDDBX88EDM88rhDDDDDDDDDDDDDDDABA888ABgDDDDDDDDDDDDDDDDDDTgyQjDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD//EACARAQEAAgICAwEBAAAAAAAAAAERABAhQDAxIEFQYZH/2gAIAQMBAT8Q/ejL2EUMnBlHryc+9Sda7Wvp+tTadRFDAEMgQ1UjgCOIo9OKuQVxFXSKmAKZUp1MuzVc/vU2PTzhN5RrqDTp8l27yyYIhkWYBI4yjvJt8/AZFNRXAFcvAhTIqa4TOA81q+MJVDVUdVbjmPLKtxwm8/13nCbi1eQLgQxchlm7S3LUuG8nWLlMSkx8fq+PCWTAhDJwQSOWT4hD7vGomqDVoyKuSXKtyS5UuSjUlpVfJAcojrkGrs1NmvQ1BOUHoIlYUFxbsqXGg9BDG4Ju7I+AgNmbi3l8zumGeN+wZ/HIcuzPOO69AQ0w8AfXwQe8LCq16Zx6wP7z+uL/AHi393//xAAdEQEAAwADAQEBAAAAAAAAAAABABARITBAMSBQ/9oACAECAQE/EP72+hcmwd867Q55lXxS8jQUMo8agbCmMXiXKFfVCh3wrsDaVKkyDngVBhFz8DsTaXeuwbS7WRipMg53LigyLlChQ7E2lx2rmBtLsDa+qTIOU/Yue8qDIqUTSlB2tfEXYHMXKyjmDGH2fFHzraHihxFsDZkTIrLx3M2twoUK3ilh2i9h+dsdyZ+2w3vTYmWRiNg2BngyP6EB5MJiYf3v/8QAKhABAAEDBAIBBQADAQEBAAAAAREAITEQQVFhcYGRIEBQobHB4fCA0fH/2gAIAQEAAT8Q/wDCSMb2OR/ED5YMpV8iMcL+InwyNz8gxZUASrwUYvCUvnDiJnlyAphKMhfOnMxP8JaZsqFEI8P49GdWWx9i+ym3tW1OKn3mMh+hbdf8B+O2BlSxp7FgOU2lo0PXwB/Xdd2+pGajsh+nccjCVuHqlnfgYTkdofxgIdslTAAZVqJHLwxCy8LHarf6GgByvBMLrwkdItqRDuJAYRHCP4sFersgLdhgPbekaNAi4c4w8IVeB3ikYMccYQ8sjwm86OKAIg7MW1jBYL03/FJtEiJOsZwHKCjv4BYCDy8u7o8LcWASquAKkgy0kyunKD0A2pS6M0sSsnKz2I3owO5sgkRMib6Hy2SwIfD3tU1wRFusZ2YwE/EACEYAJVo0QpJeDitBv2uQKKzURBDcLXs4c06banvlt0hy5cg7bU6pzRHSSzMXFsLdNk0gQhESEfw5MAOBbN6W+Tleo0mEIYHG+t2MBdqYsQGUz6Ng2INVLcBgM+xwm5JT6DQ5OZ9bk5Q71moq4FcDCX0IjvZb8NGkSXByvQK6Kj5mVzkXtFfNFIBVAMtKGkC/yaUgeBiX6Wf5AsmOqFhcnMFIQREbyaTfTYyFx7ATxU4UIcDI9IDpPwrrUooZZsSywfCGWprFKEuCRdHmuHtkPqaRY4qcLubH7N113GAAy7Ay1Z5cD8JbGEmxbT5cWXBXahvUjwLABgNB+SjEsYHKYA3UKzznNYrH0Ad3W7qjO5uB/ED5UMpSI7kIL+InwyZNbN5s1ms3SJ1kuFDulGJJyuAyJsiaJfIfKCETcavNCy968+XPJAd/wTNggBKtGkINwh8BY8lvo4pntNYUNzkDKcudTElQBKvBRgckpLnDiJn+gFMhySEOdOZieHAWnqEgIR3E1l4HWFDYnACQ4O9DGgJWTdCfASPMtqZuRCiEeH8DPQdMmV/Z7OVbU0wVhxycOAK6huUz6DZWlV5VdYFriNPgl9lP6FRpMwzWQ+IBbdX+Bqz4DYWkTsSi0gx9kfCQOobNFRQnDliMr+T28PwGas6DgHtSi8i0crHe9ibwBtRTinmuS2X4WUgeB3dZVlbEn7w4DdTaiD5HAH9d13b6jVSORLencdm9bjixZ35CFdjtGs+bZbL9MLC8nFDTRYSuHKnixNmLqG9ZYTuOQfI/fhI6phiyfNh556mifSmF+oYOyHajQzEB5UYADLNOIb7riw8H9liKDVoNIbMLi48A6sWJpBEB4QyJs6tAulsL9gSeU76OKkwICDHpMCPPN++XKTnJEvRldi9EMici3ftPZo1Ij0AXVdgpdpZu6YY5SqcWbGru9wqBmCXJ2enKjFNKIDeN/wBYIV6HepwQRJPeMNhyis1aKQtuVExYWI3e3DWWq426JY3VAjpvQxCLSgkR3I0FJM5BufYeilW3jMkSTs5HcT705VlgNys+F/pUaNcWpAGduUdx40W0eEYnIN26D5YMtC7jCJQLqMplXdV0NO6hADKvFLUiwpdcJyi2LLJmnOdbLdYOU37booT6iEgcI6ExjGJBwOAwjsg0tZwuBbl0nwyZNbQ5GkRn7T1Dlo1sYpHFd8h2eZ+8SObuzA+WjVIgJuXv8i90Up3bcAEqvAVetCFixMOFujlavhPg5fW2PyG9CmmvFzrvcNlieHBqnMECMZN2YeXBaNEwbQcvz4fAL6rJiWuxMGUsDgoT+25QSI8JTUbkxE2L2+BeqSO7u7B8j92D6zxwBPd15SsaOhOWiGVbsdzg1VFXBZXDDIlPkRQggxpinRK72LtA6mWxUwbG22A4AAOA1jLY22xXIKJwtT5iJYdm7BO4ksmgERvSKzIbK4YJMh8idXWNFxllX6NuDk1knJAYAHq68p91lM0Zmc7i4HsaJQzSi4hkSZIf8MNtCqyLKkAHKoUFB2HsjLgAOpbujir66TJIEXgr5eH0zMTJEQAXgh5HejGjDEJe2cuAq6lsUVWZYUhRyJoymAIBMEp2D/arDS4QzJAEB2PunhHYEhZHSjbFNGFm3piYIwiTyHOsJcEARTZ3T5BhoxTRgpJulPgLPmG9LQKUSryukMR+aLF5SDi7tTMPU8l28rLmzadHJNKIR5HZoWrBuhPgN/AbUU4ozKChAJ02p8hzrGWbemIknKrPK0Vs0t22cBug6+5MhUKCLY5yIPNSt6ZJAxCMXmPVOhpAe7oB6vdos5Fy67+RY2mCxRSFgFRABu02Fk2Sl/KbwhtpnG/OyA/3tWA7kZAmOlgcE5WbwxrMAxPbCcPIVkqzOyE0LQg2QlvheEN6MMApSJyU0FkPeYrn4BjeIw0nhPdkh9d76JJBZgGjxPvim9NA2AgTbVeAB9zNuYyZCSl6WetCjKPsJX4KWdNBShE8AgOjQJOniPAfD6X7lGNMFuiWf+RHyGNYB4i8EsxcOI/xocVKTy3AVi3LivDihpACPJIv/An5HNToUBWkbXD5PDHd0WcFBQgF8EkemiDCvsJH4SnFGXMoslYS9pPdH285ivD/AKL0RMCACAKMVN6OssRnc/jow8r3LA9qVE2kPNzd8i6nRxW24ASq7AUlc7li1scLdHK03CVUDNl5R8FmKNAAYALABg1YjCWAkIm40kVlVDN15f7LM6ATM47W0ylgcihAanyLiO46CsDXzY2PCvVMVazdIekdIvJVmUb3H56IyAhEkSjCIHz/ANFvtyuQe/8A6cNcbJocxtEpd1oQDkzEtsNN9FJLCwQC/l2nBpl/lO4AeVoADIbCJeFh0G80VmsU0b4kVhGXhlXS7hWebk7oD4RppnQcbkoq/EPU5NGpUZVhYBgxMt8stFSwgcRtDiv+Lh5mV9ugk516C4A+WD+OgF80jKoEvEApzNFOKULENokQIyQzwnGkikqUTiPIEnN3cFGKaVW3DsXTgs+Ub0K5CKCYWTgk+QbaykzAFiMLwIDwSbl0QHEMkSAKcAycDzQ00AJPawiFJzKMcxRRG5AeST+mjimMXP29e0DO5M/Zoxoxcrh4n1Fsl5Fz0BeqGuoCADAaOZPPuZ47k+zSRSBgsd38Be2DLQwhhMBEvK5XdVopj0GwNKugJp5yvdMwpySvMYCiu9wiunZA8RMLTPoNkaQdIzTQDlhMhFuEyOyDRIMHsPc/KHpk20hhPf2ee4EOmjX1ASBsjR5krJuexr3SN8hzP0uKWwcNy5+39u5cL3pj+UgERG4mndTMgS8VzlQ7hEnwnrVCxAfg/wAmhILN4RyEdU+EMujtTRoBm8/oUS9ONSSihXd32KZP4UKanYBYFcxHdO1kcaK2IC8//DU4VjqUzPhPddsEyPaXxxoxEAMrSnyHeT/MfcNoK8otBdro+Yj4aTxcDCd46YviNcLwfSf0ojUkD/6BBjtCsJNqDADwBpl+WAYFh2oA5SphElMhwPQA6DVjpZTAcL0iumh33MCyyu1InI6YWxUGgPkWmyZRNh7EiexKwrh9B/Qap+uQJjGvRNeprqdVxgfAUUpwryPuYRKA73UOhM96GgGy+uGB/wCR1mJYGfDFW8wOG+IcjE8rRxU1vclvE9seX9KFsS2t5noh31lUR431TgJnkUr7Fny62MqdZyZP/InQxQnR7nUOjMd/cuFF4Gwr0qTAIiNxN/pcOrDlW0fFHYBcZlnyGvenfxXGT4GlbI4szNnqAdH0iWHQYibvUi6a68e4yfCaPgC6xBPgFeqeLlJhLT8/SQiAF1dqfdl4CQE6X3TCKUKLDF4SeU7/AEl2WhEWbPIl0qK3pl1soS70qL6yFpZStnpAFCnNE2WhFc2OADofSYkRCWH9kHmRij7oecUOUewsOw7p4jx2QkevG1T9LUqksGAhepg9n1yzSyYCU6mT0/VanOPfYCV/1vU3Nu3KfYyrtfeXKw3xMuG9Cmwqi5P0lAJdMkApM8QD1NDUkWFIRNkT6SqyLKkAOVYoFm8STKsTxIHQfWv/AHvEwTKekTgX3w9DlsHAjvsmcN4najH0NyscoNhMXXPBJlRn6gIUMImzqv8AEGlTYA3aABaPlMXXHJLQY+hxW1DBO2yMIPQMYLzB9+KTRJji2/sGRvJcF6sqlcRLI8/TtSSgxC/UeGxYxFMbW3M/YPhUA0tzfBYfDS3rScLuw4bBjM1t9Lu3FwrqrYDmpmiTY99/YbF2gu/gZdjM1xu5M2JGbjRqQS8zZgmDaZSYmG1W4qaz9eKmh6o+6SecWSYN8oMxLaoj3Mlhs5PgCLB+EPEhAkwiXGoP12SCLAjlYrzU6V5jQnE5TsEnig4TMkHImdJ+ktM2MA3VxR9BkGNnmcI3GRxU8/7oxF0eVgnNPmUgQ5Vbr+IGPXFL3P0I02newR4f7zRxIbtcWkr7hn7NHGf4/kOjE4BriWj+wT5X+sUfOuKXUoej/wAIf//Z
+
+" alt="Logo Grupo Aqua">
+  <h1>QR de Asistencia</h1>
+  <p id="status" class="loading">Cargando QR dinámico...</p>
+  <div id="qrContainer">
+    <canvas id="qrCanvas" width="250" height="250"></canvas>
+    <div id="errorMsg"></div>
+  </div>
+  <p>El camión debe escanear este QR al llegar. Se actualiza diariamente para seguridad.</p>
+  
+  <div id="infoContainer">
+    <h3>Información Actual</h3>
+    <p id="fechaHora">Obteniendo fecha y hora...</p>
+  </div>
+
+  <!-- Sección para detalles de entrega (cliente, ruta, productos) -->
+  <div id="detallesEntrega" style="display: none;">
+    <h4>Detalles de Entrega</h4>
+    <ul id="listaDetalles"></ul>
+    <div id="detallesError"></div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    if (!token) {
+      console.error('Error: Token requerido en URL. Ej: ?token=abc123');
+      document.getElementById('status').innerText = 'Error: Token requerido en URL.';
+      document.getElementById('errorMsg').innerText = 'Falta token. Recarga con ?token=...';
+      document.getElementById('errorMsg').style.display = 'block';
+      throw new Error('Token missing');
+    }
+    console.log(`Token detectado: ${token}`);
+
+    const canvas = document.getElementById('qrCanvas');
+    const statusEl = document.getElementById('status');
+    const errorEl = document.getElementById('errorMsg');
+    const fechaHoraEl = document.getElementById('fechaHora');
+    const detallesEl = document.getElementById('detallesEntrega');
+    const listaDetallesEl = document.getElementById('listaDetalles');
+    const detallesErrorEl = document.getElementById('detallesError');
+
+    // Función para cargar detalles de entrega (independiente del QR)
+    async function cargarDetallesEntrega() {
+      try {
+        detallesErrorEl.innerText = ''; // Limpia error previo
+        const res = await fetch(`/get-entrega/${token}`);
+        if (!res.ok) throw new Error('Token inválido o expirado');
+        const entrega = await res.json();
+        
+        // Mostrar detalles
+        listaDetallesEl.innerHTML = `
+          <li><strong>Cliente:</strong> ${entrega.cliente}</li>
+          <li><strong>Ruta:</strong> ${entrega.ruta}</li>
+          ${entrega.productos && entrega.productos.length > 0 ? 
+            `<li><strong>Productos:</strong> ${entrega.productos.map(p => `${p.cantidad} ${p.nombre}`).join(', ')}</li>` : 
+            '<li><strong>Productos:</strong> Sin productos especificados</li>'
+          }
+        `;
+        detallesEl.style.display = 'block';
+      } catch (error) {
+        console.error('Error cargando detalles:', error);
+        detallesErrorEl.innerText = `Error: ${error.message} (detalles no disponibles)`;
+        detallesEl.style.display = 'block'; // Muestra sección con error, pero no rompe QR
+      }
+    }
+
+    function resizeCanvas() {
+      const size = Math.min(300, window.innerWidth - 40);
+      canvas.width = size;
+      canvas.height = size;
+      if (canvas.getContext) {
+        actualizarQR();
+      }
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    let scrollTimeout;
+    window.addEventListener('scroll', () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, 1, 1).data;
+        if (imageData[0] === 0 && imageData[1] === 0 && imageData[2] === 0 && imageData[3] === 0) {
+          console.log('Canvas vacío por scroll, recargando QR...');
+          actualizarQR();
+        }
+      }, 300);
+    });
+
+    function actualizarFechaHora() {
+      const now = new Date();
+      const fecha = now.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const hora = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      fechaHoraEl.innerText = `Fecha/Hora: ${fecha} ${hora}`;
+    }
+
+    actualizarFechaHora();
+    setInterval(actualizarFechaHora, 60000); 
+
+    // Carga detalles (no bloquea QR)
+    cargarDetallesEntrega();
+    
+    function dibujarFallback() {
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'black';
+      ctx.font = 'bold 20px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('QR No Disponible', canvas.width / 2, canvas.height / 2 - 20);
+      ctx.font = '12px Arial';
+      ctx.fillText('Contacta admin para nuevo token', canvas.width / 2, canvas.height / 2 + 10);
+      statusEl.innerText = 'Token inválido - Genera uno nuevo en admin.';
+    }
+
+    async function actualizarQR() {
+      statusEl.innerText = 'Cargando QR dinámico...';
+      statusEl.classList.add('loading');
+      errorEl.style.display = 'none';
+
+      try {
+        console.log(`Fetch iniciando: /qr-image/${token}`);
+        const res = await fetch(`/qr-image/${token}`);
+        
+        if (!res || typeof res !== 'object' || typeof res.ok !== 'boolean') {
+          throw new Error('Respuesta inválida del servidor (posible error de red/CORS)');
+        }
+        
+        console.log(`Fetch respuesta: ${res.status} ${res.statusText}`);
+        
+        if (!res.ok) {
+          const errorText = await res.text().catch(() => 'Error desconocido');
+          console.log(`Error del servidor: ${errorText}`);
+          throw new Error(`HTTP ${res.status}: ${errorText || 'Expirado/inválido'}`);
+        }
+        
+        let base64Img = await res.text();
+        base64Img = base64Img?.trim() || ''; 
+        
+        console.log(`Base64 recibido (longitud: ${base64Img.length})`);
+        console.log(`Base64 inicia: ${base64Img.substring(0, 100)}...`);
+
+        if (!base64Img || !base64Img.startsWith('data:image/')) {
+          if (base64Img) base64Img = 'data:image/png;base64,' + base64Img;
+          else throw new Error('Base64 vacío del servidor');
+        }
+
+        const img = new Image();
+        let loadTimeout = setTimeout(() => {
+          img.onerror();
+          console.error('Timeout: Imagen no cargó en 5s');
+          statusEl.innerText = 'Timeout: QR tardó en cargar. Revisa conexión.';
+        }, 5000);
+
+        img.onload = () => {
+          clearTimeout(loadTimeout);
+          console.log('Imagen cargada OK, dibujando en canvas');
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.font = 'bold 16px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('QR Asistencia', canvas.width / 2, 25);
+          
+          ctx.font = '12px Arial';
+          ctx.fillText('Escanea al llegar', canvas.width / 2, canvas.height - 10);
+          ctx.fillText('Válido ~24 horas', canvas.width / 2, canvas.height / 2 + 10);
+          
+          statusEl.innerText = 'QR cargado. Próxima actualización en 24 horas.';
+          statusEl.classList.remove('loading');
+          console.log('QR dibujado exitosamente');
+        };
+        
+        img.onerror = (err) => {
+          clearTimeout(loadTimeout);
+          console.error('Error cargando imagen:', err);
+          statusEl.innerText = 'Error cargando QR. Revisa conexión.';
+          dibujarFallback(); 
+        };
+        
+        img.src = base64Img;
+      } catch (error) {
+        console.error('Error completo en actualizarQR:', error);
+        statusEl.innerText = 'Error al cargar QR.';
+        errorEl.innerText = `Error: ${error.message}`;
+        errorEl.style.display = 'block';
+        statusEl.classList.remove('loading');
+        dibujarFallback(); 
+        console.error(`Error: ${error.message}\n\nGenera token nuevo en admin y recarga.`);
+      }
+    }
+
+    actualizarQR();
+    setInterval(actualizarQR, 2 * 60 * 1000);
+  </script>
+</body>
+</html>

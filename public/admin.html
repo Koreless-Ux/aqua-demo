@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Aqua</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
+    input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+    button { background: rgb(7, 46, 26); color: white; border: none; cursor: pointer; }
+    button:hover { background: rgb(5, 35, 20); }
+    #productos { margin: 20px 0; }
+    .producto-item { display: flex; gap: 10px; margin: 5px 0; }
+    .producto-item input { flex: 1; }
+    .remove-btn { background: #dc3545; width: auto; padding: 5px 10px; }
+    #resultado { margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px; }
+    #lista-productos { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <!-- Aquí puedes agregar tu logo base64 si lo deseas: <img src="data:image/png;base64,[TU_BASE64]" alt="Logo Aqua" style="max-width: 200px;"> -->
+  
+  <h1>Admin Aqua - Asignar Entrega</h1>
+  
+  <form id="form-token">
+    <label>Nombre del cliente:</label>
+    <input type="text" id="cliente" placeholder="Ej: Juan Pérez" required>
+    
+    <label>Ruta:</label>
+    <input type="text" id="ruta" placeholder="Ej: Punto A" required>
+    
+    <h3>Productos a Entregar</h3>
+    <div id="productos">
+      <!-- Items dinámicos se agregan aquí -->
+    </div>
+    <button type="button" onclick="agregarProducto()">+ Agregar Producto</button>
+    
+    <button type="submit">Generar Token y URL</button>
+  </form>
+  
+  <div id="resultado"></div>
+  <div id="historial" style="margin-top: 10px;"></div>
+
+  <script>
+    let contadorProductos = 0;
+    
+    function agregarProducto() {
+      contadorProductos++;
+      const div = document.createElement('div');
+      div.className = 'producto-item';
+      div.id = `prod-${contadorProductos}`;
+      div.innerHTML = `
+        <input type="text" placeholder="Nombre (ej: funda de hielo)" required>
+        <input type="number" placeholder="Cantidad (ej: 1)" min="1" required>
+        <button type="button" class="remove-btn" onclick="removerProducto(${contadorProductos})">X</button>
+      `;
+      document.getElementById('productos').appendChild(div);
+    }
+    
+    function removerProducto(id) {
+      const div = document.getElementById(`prod-${id}`);
+      if (div) div.remove();
+    }
+    
+    document.getElementById('form-token').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const cliente = document.getElementById('cliente').value.trim();
+      const ruta = document.getElementById('ruta').value.trim();
+      
+      // Recopilar productos
+      const productosItems = document.querySelectorAll('.producto-item');
+      const productos = Array.from(productosItems).map(item => {
+        const inputs = item.querySelectorAll('input');
+        return {
+          nombre: inputs[0].value.trim(),
+          cantidad: parseInt(inputs[1].value)
+        };
+      }).filter(p => p.nombre && p.cantidad > 0);
+      
+      if (!cliente || !ruta) {
+        alert('Llena cliente y ruta.');
+        return;
+      }
+      if (productos.length === 0) {
+        alert('Agrega al menos un producto.');
+        return;
+      }
+      
+      // Llamar al endpoint con productos como JSON encoded
+      const params = new URLSearchParams({
+        cliente,
+        ruta,
+        productos: JSON.stringify(productos)
+      });
+      
+      try {
+        const response = await fetch(`/generate-token?${params}`);
+        if (!response.ok) throw new Error(`Error: ${response.status}`);
+        const data = await response.json();
+        
+        document.getElementById('resultado').innerHTML = `
+          <h3>¡Entrega asignada!</h3>
+          <p><strong>Token:</strong> ${data.token}</p>
+          <p>Enlace para el cliente: <a href="${data.urlCliente}" target="_blank">${data.urlCliente}</a></p>
+          <p><strong>Productos:</strong> ${productos.map(p => `${p.cantidad} ${p.nombre}`).join(', ')}</p>
+          <button onclick="generarQR('${data.token}')" style="margin-top: 10px; padding: 5px;">Generar QR</button>
+          <button onclick="verAsistencias()" style="margin-top: 10px; padding: 5px;">Ver Asistencias</button>
+          <button onclick="borrarLogs()" style="margin-top: 10px; padding: 5px; background: #dc3545;">Reiniciar Reporte (Borrar Logs)</button>
+        `;
+      } catch (error) {
+        document.getElementById('resultado').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+      }
+    });
+    
+    // Función para generar QR (usa endpoint existente)
+    async function generarQR(token) {
+      try {
+        const response = await fetch(`/qr-image/${token}`);
+        if (response.ok) {
+          const qrData = await response.text();
+          const img = document.createElement('img');
+          img.src = qrData;
+          img.style.maxWidth = '200px';
+          document.getElementById('resultado').appendChild(img);
+        } else {
+          alert('Error al generar QR: ' + await response.text());
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+    
+    async function verAsistencias() {
+  try {
+    // Opcional: Chequea si hay asistencias antes de descargar
+    const res = await fetch('/asistencias');
+    if (!res.ok) throw new Error('Error en servidor');
+    const data = await res.json();
+    
+    if (data.length === 0) {
+      alert('No hay asistencias confirmadas aún. Genera una confirmación primero.');
+      return; // No descarga si vacío
+    }
+    
+    // Si hay, descarga el PDF
+    window.location.href = '/finalizar-pdf'; // Esto descarga automáticamente
+    
+  } catch (error) {
+    console.error(error);
+    // Fallback: Intenta descargar de todos modos (incluso si vacío, muestra mensaje en PDF)
+    if (confirm('Error al verificar asistencias. ¿Descargar reporte de todos modos?')) {
+      window.location.href = '/finalizar-pdf';
+    }
+  }
+}
+    
+    agregarProducto();
+  </script>
+</body>
+</html>

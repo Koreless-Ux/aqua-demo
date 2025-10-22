@@ -1,0 +1,16 @@
+[2025-10-21T03:53:31.800Z] Token generado: t5ug4 | Cliente: JORGE CARRERA | Ruta: TV5 | Expira: 2025-10-21T04:08:31.800Z | BaseURL: http://localhost:3000
+[2025-10-21T03:53:34.236Z] Token OK: JORGE CARRERA | Expira: 2025-10-21T04:08:31.800Z
+[2025-10-21T03:53:34.237Z] QR data URL generada: http://192.168.100.45:3000/confirmar.html?token=t5ug4&subToken=dDV1ZzQxNz&timestamp=1761018814237
+[2025-10-21T03:53:34.265Z] Token OK: JORGE CARRERA | Expira: 2025-10-21T04:08:31.800Z
+[2025-10-21T03:53:34.266Z] QR data URL generada: http://192.168.100.45:3000/confirmar.html?token=t5ug4&subToken=dDV1ZzQxNz&timestamp=1761018814266
+[2025-10-21T03:53:37.624Z] ¡Confirmado! JORGE CARRERA | Fecha: 2025-10-21T03:53:37.624Z
+[2025-10-21T03:53:59.551Z] Token generado: tbkf2m | Cliente: BELLA MARÍN | Ruta: TV656 | Expira: 2025-10-21T04:08:59.551Z | BaseURL: http://localhost:3000
+[2025-10-21T03:54:00.822Z] Token OK: BELLA MARÍN | Expira: 2025-10-21T04:08:59.551Z
+[2025-10-21T03:54:00.822Z] QR data URL generada: http://192.168.100.45:3000/confirmar.html?token=tbkf2m&subToken=dGJrZjJtMT&timestamp=1761018840822
+[2025-10-21T03:54:00.845Z] Token OK: BELLA MARÍN | Expira: 2025-10-21T04:08:59.551Z
+[2025-10-21T03:54:00.845Z] QR data URL generada: http://192.168.100.45:3000/confirmar.html?token=tbkf2m&subToken=dGJrZjJtMT&timestamp=1761018840845
+[2025-10-21T03:54:03.406Z] Token OK: BELLA MARÍN | Expira: 2025-10-21T04:08:59.551Z
+[2025-10-21T03:54:03.406Z] QR data URL generada: http://192.168.100.45:3000/confirmar.html?token=tbkf2m&subToken=dGJrZjJtMT&timestamp=1761018843406
+[2025-10-21T03:54:03.453Z] Token OK: BELLA MARÍN | Expira: 2025-10-21T04:08:59.551Z
+[2025-10-21T03:54:03.454Z] QR data URL generada: http://192.168.100.45:3000/confirmar.html?token=tbkf2m&subToken=dGJrZjJtMT&timestamp=1761018843454
+[2025-10-21T03:54:08.578Z] ¡Confirmado! BELLA MARÍN | Fecha: 2025-10-21T03:54:08.578Z

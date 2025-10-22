@@ -1,0 +1,20 @@
+{
+  "name": "aqua-demo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0",
+    "html5-qrcode": "^2.3.8",
+    "pdfkit": "^0.17.2",
+    "puppeteer": "^24.25.0",
+    "qrcode": "^1.5.4"
+  }
+}
