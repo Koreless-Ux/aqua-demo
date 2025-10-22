@@ -5,10 +5,9 @@ const fs = require('fs');
 const puppeteer = require('puppeteer');
 const app = express();
 app.set('trust proxy', true);
-app.use(express.static('public'));
-app.get('/favicon.png', (req, res) => res.status(204).end()); // Devuelve vacío sin error 
-// Rutas explícitas para HTML estáticos (asegura serving en Vercel)
-app.use(express.json());
+app.use(express.static('public')); // Mover al inicio para servir estáticos primero
+app.use(express.json()); // Después de static
+app.get('/favicon.png', (req, res) => res.status(204).end()); // Devuelve vacío sin error
 
 function logDebug(mensaje) {
   const timestamp = new Date().toISOString();
@@ -34,13 +33,43 @@ function agregarConfirmacion(cliente, ruta, fechaISO, productos = []) {  // NUEV
   const timestamp = new Date().toISOString();
   const productosStr = productos.map(p => `${p.cantidad} ${p.nombre}`).join(', ');  // NUEVO: Resumir productos
   const linea = `[${timestamp}] ¡Confirmado! ${cliente} | Ruta: ${ruta} | Fecha: ${fechaISO} | Productos: ${productosStr}`;  // NUEVO: Incluir productos
-  fs.appendFileSync(logFile, linea + '\n', 'utf8');
+  try {
+    fs.appendFileSync(logFile, linea + '\n', 'utf8');
+  } catch (e) {
+    console.log('Error escribiendo log (read-only FS):', e); // Fallback silencioso en Vercel
+  }
 }
 
 app.get('/', (req, res) => {
   const filePath = path.join(__dirname, 'public', 'admin.html');
   res.type('text/html'); 
   res.sendFile(filePath);
+});
+
+// Rutas explícitas para HTML estáticos (asegura serving en Vercel, pero con try-catch para path)
+app.get('/cliente.html', (req, res) => {
+  try {
+    res.sendFile(path.join(__dirname, 'public', 'cliente.html'));
+  } catch (e) {
+    console.log('Error sirviendo cliente.html:', e);
+    res.status(404).send('Archivo no encontrado');
+  }
+});
+app.get('/confirmar.html', (req, res) => {
+  try {
+    res.sendFile(path.join(__dirname, 'public', 'confirmar.html'));
+  } catch (e) {
+    console.log('Error sirviendo confirmar.html:', e);
+    res.status(404).send('Archivo no encontrado');
+  }
+});
+app.get('/admin.html', (req, res) => {
+  try {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+  } catch (e) {
+    console.log('Error sirviendo admin.html:', e);
+    res.status(404).send('Archivo no encontrado');
+  }
 });
 
 app.get('/generate-token', (req, res) => {
@@ -64,8 +93,8 @@ app.get('/generate-token', (req, res) => {
     llegada: null 
   });
   
-  // CAMBIO PROPUESTO: URL dinámica para deployment (ya estaba, pero aseguramos con trust proxy)
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  // URL dinámica para deployment
+  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `${req.protocol}://${req.get('host')}`;
   const urlCliente = `${baseUrl}/cliente.html?token=${token}`;
   
   const logMsg = `Token generado: ${token} | Cliente: ${cliente} | Ruta: ${ruta} | Productos: ${JSON.stringify(productosParsed)} | Expira: ${new Date(expira).toISOString()} | BaseURL: ${baseUrl}`;  // NUEVO: Incluir productos y baseURL en log
@@ -75,10 +104,18 @@ app.get('/generate-token', (req, res) => {
 });
 
 let entregas = []; 
-if (fs.existsSync('entregas.json')) {
-  entregas = JSON.parse(fs.readFileSync('entregas.json', 'utf8'));
-  console.log(`Cargados ${entregas.length} tokens desde archivo`);
-}  
+// Carga con try-catch para evitar crash en Vercel (no existe el archivo)
+try {
+  if (fs.existsSync('entregas.json')) {
+    entregas = JSON.parse(fs.readFileSync('entregas.json', 'utf8'));
+    console.log(`Cargados ${entregas.length} tokens desde archivo`);
+  } else {
+    console.log('entregas.json no existe (normal en Vercel)');
+  }
+} catch (e) {
+  console.log('Error cargando entregas.json (read-only o no existe):', e);
+  entregas = [];
+}
 
 setInterval(() => {
   const prevCount = entregas.length;
@@ -110,8 +147,8 @@ app.get('/generar-qr/:cliente/:ruta', (req, res) => {
     llegada: null
   });
   
-  // CAMBIO PROPUESTO: URL dinámica para deployment (ya estaba, pero con log mejorado)
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  // URL dinámica para deployment
+  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `${req.protocol}://${req.get('host')}`;
   const urlCliente = `${baseUrl}/cliente.html?token=${token}`;
   
   const logMsg = `Token generado: ${token} | Cliente: ${cliente} | Ruta: ${ruta} | Productos: ${JSON.stringify(productosParsed)} | Expira: ${new Date(expira).toISOString()} | BaseURL: ${baseUrl}`;  // NUEVO: Incluir productos
@@ -147,7 +184,7 @@ app.get('/qr-image/:token', async (req, res) => {
   const timestamp = Date.now();
   const subToken = Buffer.from(token + timestamp).toString('base64').substring(0, 10); 
   
-  // CAMBIO PROPUESTO: URL dinámica en QR data (ya estaba, pero aseguramos)
+  // URL dinámica en QR data
   const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `${req.protocol}://${req.get('host')}`;
   const data = `${baseUrl}/confirmar.html?token=${token}&subToken=${subToken}&timestamp=${timestamp}`;
   
@@ -215,7 +252,14 @@ app.get('/debug-tokens', (req, res) => {
 
 // Endpoint para generar y descargar PDF (solo confirmaciones del TXT)
 app.get('/finalizar-pdf', async (req, res) => {
-  if (!fs.existsSync(logFile)) {
+  // Try-catch para logFile en Vercel (read-only)
+  let hasLogs = false;
+  try {
+    hasLogs = fs.existsSync(logFile);
+  } catch (e) {
+    console.log('Error chequeando logFile:', e);
+  }
+  if (!hasLogs) {
     return res.status(400).send('No hay confirmaciones para generar PDF. (Genera una asistencia primero).');
   }
 
@@ -353,9 +397,10 @@ app.get('/finalizar-pdf', async (req, res) => {
   }
 });
 
-setInterval(() => {
-  fs.writeFileSync('entregas.json', JSON.stringify(entregas, null, 2));
-}, 30000);
+// REMOVIDO: setInterval de save – causa crash en Vercel (read-only FS)
+// setInterval(() => {
+//   fs.writeFileSync('entregas.json', JSON.stringify(entregas, null, 2));
+// }, 30000);
 
 // NUEVO: Endpoint para obtener detalles de entrega por token (para cliente.html y confirmar.html)
 app.get('/get-entrega/:token', (req, res) => {
@@ -379,10 +424,14 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 // NUEVO: Endpoint para borrar logs (solo desde admin, por seguridad)
 app.delete('/borrar-logs', (req, res) => {
-  if (fs.existsSync(logFile)) {
-    fs.unlinkSync(logFile);
-    logDebug('Logs de confirmaciones borrados manualmente.');
-    return res.json({ ok: true, msg: 'Logs borrados. Reporte reiniciado.' });
+  try {
+    if (fs.existsSync(logFile)) {
+      fs.unlinkSync(logFile);
+      logDebug('Logs de confirmaciones borrados manualmente.');
+      return res.json({ ok: true, msg: 'Logs borrados. Reporte reiniciado.' });
+    }
+  } catch (e) {
+    console.log('Error borrando logs (read-only FS):', e);
   }
   return res.json({ ok: true, msg: 'No hay logs para borrar.' });
 });
