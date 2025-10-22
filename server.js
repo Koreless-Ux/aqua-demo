@@ -5,7 +5,18 @@ const fs = require('fs');
 const puppeteer = require('puppeteer');
 const app = express();
 app.set('trust proxy', true);
-app.use(express.static('public')); 
+app.use(express.static('public'));
+app.get('/favicon.png', (req, res) => res.status(204).end()); // Devuelve vacío sin error 
+// Rutas explícitas para HTML estáticos (asegura serving en Vercel)
+app.get('/cliente.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'cliente.html'));
+});
+app.get('/confirmar.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'confirmar.html'));
+});
+app.get('/admin.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
 app.use(express.json());
 
 function logDebug(mensaje) {
