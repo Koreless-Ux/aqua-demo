@@ -9,7 +9,9 @@
   "routes": [
     {
       "src": "/public/(.*)",
-      "headers": { "cache-control": "public, max-age=31536000" },
+      "headers": {
+        "cache-control": "public, max-age=31536000"
+      },
       "dest": "/public/$1"
     },
     {
