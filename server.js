@@ -8,15 +8,6 @@ app.set('trust proxy', true);
 app.use(express.static('public'));
 app.get('/favicon.png', (req, res) => res.status(204).end()); // Devuelve vacío sin error 
 // Rutas explícitas para HTML estáticos (asegura serving en Vercel)
-app.get('/cliente.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'cliente.html'));
-});
-app.get('/confirmar.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'confirmar.html'));
-});
-app.get('/admin.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
 app.use(express.json());
 
 function logDebug(mensaje) {
@@ -157,7 +148,7 @@ app.get('/qr-image/:token', async (req, res) => {
   const subToken = Buffer.from(token + timestamp).toString('base64').substring(0, 10); 
   
   // CAMBIO PROPUESTO: URL dinámica en QR data (ya estaba, pero aseguramos)
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `${req.protocol}://${req.get('host')}`;
   const data = `${baseUrl}/confirmar.html?token=${token}&subToken=${subToken}&timestamp=${timestamp}`;
   
   const logMsgQR = `QR data URL generada: ${data}`;
