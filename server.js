@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const puppeteer = require('puppeteer');
 const app = express();
+app.set('trust proxy', true);
 app.use(express.static('public')); 
 app.use(express.json());
 
@@ -61,10 +62,11 @@ app.get('/generate-token', (req, res) => {
     llegada: null 
   });
   
-  const baseUrl = req.headers['user-agent']?.includes('Mobile') ? 'http://192.168.100.45:3000' : 'http://localhost:3000';
+  // CAMBIO PROPUESTO: URL dinámica para deployment (ya estaba, pero aseguramos con trust proxy)
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
   const urlCliente = `${baseUrl}/cliente.html?token=${token}`;
   
-  const logMsg = `Token generado: ${token} | Cliente: ${cliente} | Ruta: ${ruta} | Productos: ${JSON.stringify(productosParsed)} | Expira: ${new Date(expira).toISOString()}`;  // NUEVO: Incluir productos en log
+  const logMsg = `Token generado: ${token} | Cliente: ${cliente} | Ruta: ${ruta} | Productos: ${JSON.stringify(productosParsed)} | Expira: ${new Date(expira).toISOString()} | BaseURL: ${baseUrl}`;  // NUEVO: Incluir productos y baseURL en log
   logDebug(logMsg); 
   
   res.json({ token, urlCliente }); 
@@ -106,7 +108,8 @@ app.get('/generar-qr/:cliente/:ruta', (req, res) => {
     llegada: null
   });
   
-  const baseUrl = req.headers['user-agent']?.includes('Mobile') ? 'http://192.168.100.45:3000' : 'http://localhost:3000';
+  // CAMBIO PROPUESTO: URL dinámica para deployment (ya estaba, pero con log mejorado)
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
   const urlCliente = `${baseUrl}/cliente.html?token=${token}`;
   
   const logMsg = `Token generado: ${token} | Cliente: ${cliente} | Ruta: ${ruta} | Productos: ${JSON.stringify(productosParsed)} | Expira: ${new Date(expira).toISOString()} | BaseURL: ${baseUrl}`;  // NUEVO: Incluir productos
@@ -142,7 +145,8 @@ app.get('/qr-image/:token', async (req, res) => {
   const timestamp = Date.now();
   const subToken = Buffer.from(token + timestamp).toString('base64').substring(0, 10); 
   
-  const baseUrl = 'http://192.168.100.45:3000';
+  // CAMBIO PROPUESTO: URL dinámica en QR data (ya estaba, pero aseguramos)
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
   const data = `${baseUrl}/confirmar.html?token=${token}&subToken=${subToken}&timestamp=${timestamp}`;
   
   const logMsgQR = `QR data URL generada: ${data}`;
@@ -365,8 +369,9 @@ app.get('/get-entrega/:token', (req, res) => {
   });
 });
 
-app.listen(3000, '0.0.0.0', () => {
-  console.log('Servidor en http://localhost:3000 (PC) y http://192.168.100.45:3000 (móvil)');
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Servidor en puerto ${PORT}`);
   console.log('Debug: Ve a /debug-tokens para ver tokens activos con productos');
   console.log('Nuevo: Ve a /finalizar-pdf para generar PDF con productos');
 });

@@ -87,7 +87,7 @@
         return;
       }
       
-      // Llamar al endpoint con productos como JSON encoded
+      // Llamar al endpoint con productos como JSON encoded (URL relativa, funciona en cualquier dominio)
       const params = new URLSearchParams({
         cliente,
         ruta,
@@ -113,7 +113,7 @@
       }
     });
     
-    // Función para generar QR (usa endpoint existente)
+    // Función para generar QR (usa endpoint existente, URL relativa)
     async function generarQR(token) {
       try {
         const response = await fetch(`/qr-image/${token}`);
@@ -132,28 +132,44 @@
     }
     
     async function verAsistencias() {
-  try {
-    // Opcional: Chequea si hay asistencias antes de descargar
-    const res = await fetch('/asistencias');
-    if (!res.ok) throw new Error('Error en servidor');
-    const data = await res.json();
-    
-    if (data.length === 0) {
-      alert('No hay asistencias confirmadas aún. Genera una confirmación primero.');
-      return; // No descarga si vacío
+      try {
+        // Opcional: Chequea si hay asistencias antes de descargar (URL relativa)
+        const res = await fetch('/asistencias');
+        if (!res.ok) throw new Error('Error en servidor');
+        const data = await res.json();
+        
+        if (data.length === 0) {
+          alert('No hay asistencias confirmadas aún. Genera una confirmación primero.');
+          return; // No descarga si vacío
+        }
+        
+        // Si hay, descarga el PDF (URL relativa)
+        window.location.href = '/finalizar-pdf'; // Esto descarga automáticamente
+        
+      } catch (error) {
+        console.error(error);
+        // Fallback: Intenta descargar de todos modos (incluso si vacío, muestra mensaje en PDF)
+        if (confirm('Error al verificar asistencias. ¿Descargar reporte de todos modos?')) {
+          window.location.href = '/finalizar-pdf';
+        }
+      }
     }
-    
-    // Si hay, descarga el PDF
-    window.location.href = '/finalizar-pdf'; // Esto descarga automáticamente
-    
-  } catch (error) {
-    console.error(error);
-    // Fallback: Intenta descargar de todos modos (incluso si vacío, muestra mensaje en PDF)
-    if (confirm('Error al verificar asistencias. ¿Descargar reporte de todos modos?')) {
-      window.location.href = '/finalizar-pdf';
+
+    // Nueva función para borrar logs (DELETE request, URL relativa)
+    async function borrarLogs() {
+      if (!confirm('¿Estás seguro? Esto reiniciará el reporte borrando todos los logs de confirmaciones.')) {
+        return;
+      }
+      try {
+        const response = await fetch('/borrar-logs', { method: 'DELETE' });
+        if (!response.ok) throw new Error('Error al borrar logs');
+        const data = await response.json();
+        alert(data.msg);
+        // Opcional: Recargar asistencias o limpiar UI
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
     }
-  }
-}
     
     agregarProducto();
   </script>

@@ -108,6 +108,16 @@
       font-size: 14px;
       margin-top: 5px;
     }
+    #fallbackLink {
+      margin-top: 20px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 5px;
+    }
+    #fallbackLink a {
+      color: #f0f1f1;
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -135,6 +145,11 @@
     <div id="detallesError"></div>
   </div>
 
+  <!-- Fallback para confirmar manualmente (usa origen dinámico) -->
+  <div id="fallbackLink" style="display: none;">
+    <p><strong>No carga QR?</strong> Usa este enlace manual: <a href="#" id="manualLink">Confirmar en línea</a></p>
+  </div>
+
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
@@ -154,8 +169,14 @@
     const detallesEl = document.getElementById('detallesEntrega');
     const listaDetallesEl = document.getElementById('listaDetalles');
     const detallesErrorEl = document.getElementById('detallesError');
+    const fallbackLinkEl = document.getElementById('fallbackLink');
+    const manualLinkEl = document.getElementById('manualLink');
 
-    // Función para cargar detalles de entrega (independiente del QR)
+    // Configurar enlace manual con origen dinámico (funciona en Vercel/online)
+    manualLinkEl.href = `${window.location.origin}/confirmar.html?token=${token}`;
+    manualLinkEl.textContent = `${window.location.origin}/confirmar.html?token=${token}`;
+
+    // Función para cargar detalles de entrega (URL relativa, funciona online)
     async function cargarDetallesEntrega() {
       try {
         detallesErrorEl.innerText = ''; // Limpia error previo
@@ -226,14 +247,16 @@
       ctx.textAlign = 'center';
       ctx.fillText('QR No Disponible', canvas.width / 2, canvas.height / 2 - 20);
       ctx.font = '12px Arial';
-      ctx.fillText('Contacta admin para nuevo token', canvas.width / 2, canvas.height / 2 + 10);
+      ctx.fillText('Usa el enlace manual', canvas.width / 2, canvas.height / 2 + 10);
       statusEl.innerText = 'Token inválido - Genera uno nuevo en admin.';
+      fallbackLinkEl.style.display = 'block'; // Muestra fallback
     }
 
     async function actualizarQR() {
       statusEl.innerText = 'Cargando QR dinámico...';
       statusEl.classList.add('loading');
       errorEl.style.display = 'none';
+      fallbackLinkEl.style.display = 'none'; // Oculta fallback inicialmente
 
       try {
         console.log(`Fetch iniciando: /qr-image/${token}`);
@@ -267,6 +290,7 @@
           img.onerror();
           console.error('Timeout: Imagen no cargó en 5s');
           statusEl.innerText = 'Timeout: QR tardó en cargar. Revisa conexión.';
+          fallbackLinkEl.style.display = 'block'; // Muestra fallback en timeout
         }, 5000);
 
         img.onload = () => {
@@ -293,7 +317,8 @@
         img.onerror = (err) => {
           clearTimeout(loadTimeout);
           console.error('Error cargando imagen:', err);
-          statusEl.innerText = 'Error cargando QR. Revisa conexión.';
+          statusEl.innerText = 'Error cargando QR. Usa enlace manual.';
+          fallbackLinkEl.style.display = 'block'; // Muestra fallback
           dibujarFallback(); 
         };
         
@@ -304,6 +329,7 @@
         errorEl.innerText = `Error: ${error.message}`;
         errorEl.style.display = 'block';
         statusEl.classList.remove('loading');
+        fallbackLinkEl.style.display = 'block'; // Muestra fallback en error
         dibujarFallback(); 
         console.error(`Error: ${error.message}\n\nGenera token nuevo en admin y recarga.`);
       }

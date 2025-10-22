@@ -90,6 +90,16 @@
       margin: 0 auto;
     }
     button:disabled { background: #ccc; }
+    #fallbackLink {
+      margin-top: 20px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 5px;
+    }
+    #fallbackLink a {
+      color: #eff1f0;
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -99,7 +109,7 @@
 
 " alt="Logo Grupo Aqua">
   
-  <div id="status" class="loading">Cargando confirmación...</div>
+<div id="status" class="loading">Cargando confirmación...</div>
   
   <!-- Sección para detalles de entrega (cliente, ruta, productos) -->
   <div id="detallesEntrega">
@@ -115,11 +125,18 @@
   
   <button id="confirmBtn" style="display: none;" onclick="enviarCheckin()">Confirmar Llegada</button>
 
+  <!-- Fallback para errores (usa origen dinámico para regenerar QR si es necesario) -->
+  <div id="fallbackLink" style="display: none;">
+    <p><strong>Problemas?</strong> Regresa a detalles: <a href="#" id="manualLink">Ver QR en línea</a></p>
+  </div>
+
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     if (!token) {
       document.getElementById('status').innerHTML = '<p class="error">Error: Token inválido.</p>';
+      document.getElementById('fallbackLink').style.display = 'block';
+      document.getElementById('manualLink').href = `${window.location.origin}/cliente.html?token=${token || ''}`;
       throw new Error('Token missing');
     }
 
@@ -130,8 +147,14 @@
     const detallesEl = document.getElementById('detallesEntrega');
     const listaDetallesEl = document.getElementById('listaDetalles');
     const detallesErrorEl = document.getElementById('detallesError');
+    const fallbackLinkEl = document.getElementById('fallbackLink');
+    const manualLinkEl = document.getElementById('manualLink');
 
-    // Función para cargar detalles de entrega (independiente del resto)
+    // Configurar enlace manual con origen dinámico (funciona en Vercel/online)
+    manualLinkEl.href = `${window.location.origin}/cliente.html?token=${token}`;
+    manualLinkEl.textContent = `${window.location.origin}/cliente.html?token=${token}`;
+
+    // Función para cargar detalles de entrega (URL relativa, funciona online)
     async function cargarDetallesEntrega() {
       try {
         detallesErrorEl.innerText = ''; // Limpia error previo
@@ -141,19 +164,20 @@
         
         // Mostrar detalles
         listaDetallesEl.innerHTML = `
-  <li><strong>Cliente:</strong> ${entrega.cliente}</li>
-  <li><strong>Ruta:</strong> ${entrega.ruta}</li>
-  ${entrega.productos && entrega.productos.length > 0 ? 
-    `<li><strong>Productos a entregar:</strong></li>
-     ${entrega.productos.map(p => `<li>${p.cantidad} ${p.nombre}</li>`).join('')}` : 
-    '<li><strong>Productos:</strong> Sin productos especificados</li>'
-  }
-`;
+          <li><strong>Cliente:</strong> ${entrega.cliente}</li>
+          <li><strong>Ruta:</strong> ${entrega.ruta}</li>
+          ${entrega.productos && entrega.productos.length > 0 ? 
+            `<li><strong>Productos a entregar:</strong></li>
+             ${entrega.productos.map(p => `<li>${p.cantidad} ${p.nombre}</li>`).join('')}` : 
+            '<li><strong>Productos:</strong> Sin productos especificados</li>'
+          }
+        `;
         detallesEl.style.display = 'block';
       } catch (error) {
         console.error('Error cargando detalles:', error);
         detallesErrorEl.innerText = `Error: ${error.message} (detalles no disponibles)`;
         detallesEl.style.display = 'block'; // Muestra con error, no rompe
+        fallbackLinkEl.style.display = 'block'; // Muestra fallback en error de detalles
       }
     }
     
@@ -201,6 +225,7 @@
         statusEl.innerHTML = `<p class="error">Error: ${error.message}. <br> <button onclick="enviarCheckin()">Reintentar</button></p>`;
         confirmBtn.disabled = false;
         confirmBtn.innerText = 'Confirmar Llegada';
+        fallbackLinkEl.style.display = 'block'; // Muestra fallback en error de envío
       }
     }
   </script>
