@@ -131,103 +131,127 @@
   </div>
 
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-    if (!token) {
-      document.getElementById('status').innerHTML = '<p class="error">Error: Token inválido.</p>';
-      document.getElementById('fallbackLink').style.display = 'block';
-      document.getElementById('manualLink').href = `${window.location.origin}/cliente.html?token=${token || ''}`;
-      throw new Error('Token missing');
-    }
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get('token');
+  const subToken = urlParams.get('subToken');
+  const timestamp = urlParams.get('timestamp');
+  
+  console.log('Params leídos:', { token, subToken, timestamp }); // LOG: Revisa consola del navegador para debug
+  
+  if (!token) {
+    document.getElementById('status').innerHTML = '<p class="error">Error: Token inválido o faltante.</p>';
+    document.getElementById('fallbackLink').style.display = 'block';
+    document.getElementById('manualLink').href = `${window.location.origin}/cliente.html`;
+    document.getElementById('manualLink').textContent = `${window.location.origin}/cliente.html`;
+    throw new Error('Token missing');
+  }
+  
+  // NUEVO: Check para subToken y timestamp – si faltan, error temprano
+  if (!subToken || !timestamp) {
+    document.getElementById('status').innerHTML = '<p class="error">Error: Parámetros del QR incompletos (subToken o timestamp faltan). Regenera el QR en cliente.html.</p>';
+    document.getElementById('fallbackLink').style.display = 'block';
+    document.getElementById('manualLink').href = `${window.location.origin}/cliente.html?token=${token}`;
+    document.getElementById('manualLink').textContent = `${window.location.origin}/cliente.html?token=${token}`;
+    throw new Error('SubToken o Timestamp missing');
+  }
 
-    const statusEl = document.getElementById('status');
-    const infoEl = document.getElementById('info');
-    const fechaHoraEl = document.getElementById('fechaHora');
-    const confirmBtn = document.getElementById('confirmBtn');
-    const detallesEl = document.getElementById('detallesEntrega');
-    const listaDetallesEl = document.getElementById('listaDetalles');
-    const detallesErrorEl = document.getElementById('detallesError');
-    const fallbackLinkEl = document.getElementById('fallbackLink');
-    const manualLinkEl = document.getElementById('manualLink');
+  const statusEl = document.getElementById('status');
+  const infoEl = document.getElementById('info');
+  const fechaHoraEl = document.getElementById('fechaHora');
+  const confirmBtn = document.getElementById('confirmBtn');
+  const detallesEl = document.getElementById('detallesEntrega');
+  const listaDetallesEl = document.getElementById('listaDetalles');
+  const detallesErrorEl = document.getElementById('detallesError');
+  const fallbackLinkEl = document.getElementById('fallbackLink');
+  const manualLinkEl = document.getElementById('manualLink');
 
-    // Configurar enlace manual con origen dinámico (funciona en Vercel/online)
-    manualLinkEl.href = `${window.location.origin}/cliente.html?token=${token}`;
-    manualLinkEl.textContent = `${window.location.origin}/cliente.html?token=${token}`;
+  // Configurar enlace manual con origen dinámico
+  manualLinkEl.href = `${window.location.origin}/cliente.html?token=${token}`;
+  manualLinkEl.textContent = `${window.location.origin}/cliente.html?token=${token}`;
 
-    // Función para cargar detalles de entrega (URL relativa, funciona online)
-    async function cargarDetallesEntrega() {
-      try {
-        detallesErrorEl.innerText = ''; // Limpia error previo
-        const res = await fetch(`/get-entrega/${token}`);
-        if (!res.ok) throw new Error('Token inválido o expirado');
-        const entrega = await res.json();
-        
-        // Mostrar detalles
-        listaDetallesEl.innerHTML = `
-          <li><strong>Cliente:</strong> ${entrega.cliente}</li>
-          <li><strong>Ruta:</strong> ${entrega.ruta}</li>
-          ${entrega.productos && entrega.productos.length > 0 ? 
-            `<li><strong>Productos a entregar:</strong></li>
-             ${entrega.productos.map(p => `<li>${p.cantidad} ${p.nombre}</li>`).join('')}` : 
-            '<li><strong>Productos:</strong> Sin productos especificados</li>'
-          }
-        `;
-        detallesEl.style.display = 'block';
-      } catch (error) {
-        console.error('Error cargando detalles:', error);
-        detallesErrorEl.innerText = `Error: ${error.message} (detalles no disponibles)`;
-        detallesEl.style.display = 'block'; // Muestra con error, no rompe
-        fallbackLinkEl.style.display = 'block'; // Muestra fallback en error de detalles
-      }
-    }
-    
-    function actualizarFechaHora() {
-      const now = new Date();
-      const fecha = now.toLocaleDateString('es-ES');
-      const hora = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-      fechaHoraEl.innerText = `Fecha/Hora: ${fecha} ${hora}`;
-    }
-
-    // Carga detalles al inicio (no bloquea botón)
-    cargarDetallesEntrega();
-    
-    actualizarFechaHora();
-    infoEl.style.display = 'block';
-    confirmBtn.style.display = 'block';
-    statusEl.innerHTML = '<p class="success">Listo para confirmar llegada. Presiona el botón.</p>';
-
-    async function enviarCheckin() {
-      confirmBtn.disabled = true;
-      confirmBtn.innerText = 'Enviando...';
-      statusEl.innerHTML = '<p class="loading">Enviando check-in...</p>';
-
-      try {
-        const data = {
-          subToken: urlParams.get('subToken'),
-          timestamp: urlParams.get('timestamp'),
-          mainToken: token
-        };
-        const res = await fetch(`/confirmar-sub`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        if (res.ok) {
-          const response = await res.json();
-          statusEl.innerHTML = `<p class="success">${response.msg || '¡Check-in exitoso! Gracias.'}</p>`;
-          setTimeout(() => { window.close(); }, 3000);
-        } else {
-          const errText = await res.text();
-          throw new Error(errText);
+  // Función para cargar detalles de entrega
+  async function cargarDetallesEntrega() {
+    try {
+      detallesErrorEl.innerText = ''; // Limpia error previo
+      const res = await fetch(`/get-entrega/${token}`);
+      if (!res.ok) throw new Error('Token inválido o expirado');
+      const entrega = await res.json();
+      
+      // Mostrar detalles
+      listaDetallesEl.innerHTML = `
+        <li><strong>Cliente:</strong> ${entrega.cliente}</li>
+        <li><strong>Ruta:</strong> ${entrega.ruta}</li>
+        ${entrega.productos && entrega.productos.length > 0 ? 
+          `<li><strong>Productos a entregar:</strong></li>
+           ${entrega.productos.map(p => `<li>${p.cantidad} ${p.nombre}</li>`).join('')}` : 
+          '<li><strong>Productos:</strong> Sin productos especificados</li>'
         }
-      } catch (error) {
-        console.error('Error envío:', error);
-        statusEl.innerHTML = `<p class="error">Error: ${error.message}. <br> <button onclick="enviarCheckin()">Reintentar</button></p>`;
-        confirmBtn.disabled = false;
-        confirmBtn.innerText = 'Confirmar Llegada';
-        fallbackLinkEl.style.display = 'block'; // Muestra fallback en error de envío
-      }
+      `;
+      detallesEl.style.display = 'block';
+    } catch (error) {
+      console.error('Error cargando detalles:', error); // LOG
+      detallesErrorEl.innerText = `Error: ${error.message} (detalles no disponibles)`;
+      detallesEl.style.display = 'block';
+      fallbackLinkEl.style.display = 'block';
     }
-  </script>
+  }
+  
+  function actualizarFechaHora() {
+    const now = new Date();
+    const fecha = now.toLocaleDateString('es-ES');
+    const hora = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    fechaHoraEl.innerText = `Fecha/Hora: ${fecha} ${hora}`;
+  }
+
+  // Carga detalles al inicio
+  cargarDetallesEntrega();
+  
+  actualizarFechaHora();
+  infoEl.style.display = 'block';
+  confirmBtn.style.display = 'block';
+  statusEl.innerHTML = '<p class="success">Listo para confirmar llegada. Presiona el botón.</p>';
+
+  async function enviarCheckin() {
+    confirmBtn.disabled = true;
+    confirmBtn.innerText = 'Enviando...';
+    statusEl.innerHTML = '<p class="loading">Enviando check-in...</p>';
+
+    try {
+      // NUEVO: Doble check antes de enviar
+      if (!subToken || !timestamp) {
+        throw new Error('Parámetros del QR faltantes. Regenera el QR.');
+      }
+      
+      const data = {
+        subToken,
+        timestamp,
+        mainToken: token
+      };
+      console.log('Enviando data:', data); // LOG: Revisa qué se envía
+      
+      const res = await fetch(`/confirmar-sub`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      
+      if (res.ok) {
+        const response = await res.json();
+        statusEl.innerHTML = `<p class="success">${response.msg || '¡Check-in exitoso! Gracias.'}</p>`;
+        setTimeout(() => { window.close(); }, 3000);
+      } else {
+        const errText = await res.text();
+        console.error('Error del server:', errText); // LOG
+        throw new Error(errText || 'Error desconocido en confirmación');
+      }
+    } catch (error) {
+      console.error('Error envío:', error); // LOG
+      statusEl.innerHTML = `<p class="error">Error: ${error.message}. <br> <button onclick="enviarCheckin()">Reintentar</button></p>`;
+      confirmBtn.disabled = false;
+      confirmBtn.innerText = 'Confirmar Llegada';
+      fallbackLinkEl.style.display = 'block';
+    }
+  }
+</script>
 </body>
 </html>
