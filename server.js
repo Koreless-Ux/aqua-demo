@@ -46,31 +46,61 @@ function formatearFecha(fechaISO) {
 
 // Helpers KV (persistente)
 async function loadPendingEntregas() {
-  logDebug('[KV DEBUG] Cargando pending-entregas con Vercel KV');  // Log para debug
+  logDebug('[KV DEBUG] Cargando pending-entregas con Vercel KV');
   const json = await kv.get('pending-entregas');
-  logDebug(`[KV DEBUG] Raw json from get: ${json ? 'OK (' + (typeof json === 'string' ? json.length : 'object') + ' chars)' : 'NULL - No data yet'}`);
+  logDebug(`[KV DEBUG] Raw json from get: ${json ? (typeof json === 'string' ? 'String OK (' + json.length + ' chars)' : 'Object OK - Usando directo') : 'NULL - No data yet'}`);
+  
+  let arr = [];
   if (json) {
-    const arr = JSON.parse(json);
-    const now = Date.now();
-    const active = arr.filter(e => !e.asistido && now < e.expira);
-    logDebug(`[KV LOAD] Filtrando: ${arr.length} total -> ${active.length} activos. Removidos: ${arr.length - active.length} (expirados/usados)`);
-    if (active.length !== arr.length) {
-      await savePendingEntregas(active);
-      logDebug(`Limpieza KV: Removidos ${arr.length - active.length}. Activos: ${active.length}`);
+    try {
+      if (typeof json === 'string') {
+        arr = JSON.parse(json);
+      } else if (typeof json === 'object' && json !== null) {
+        // Si es object (data corrupta vieja), úsalo directo pero log warning
+        logDebug('[KV WARNING] json es object - Usando directo (limpia KV después)');
+        arr = json;
+      } else {
+        throw new Error('Tipo inválido');
+      }
+    } catch (e) {
+      logDebug(`[KV ERROR] Parse falló: ${e.message} - Reseteando a []`);
+      arr = [];
     }
-    return active;
   }
-  return [];
+  
+  const now = Date.now();
+  const active = arr.filter(e => !e.asistido && now < e.expira);
+  logDebug(`[KV LOAD] Filtrando: ${arr.length} total -> ${active.length} activos. Removidos: ${arr.length - active.length} (expirados/usados)`);
+  
+  if (active.length !== arr.length) {
+    await savePendingEntregas(active);
+    logDebug(`Limpieza KV: Removidos ${arr.length - active.length}. Activos: ${active.length}`);
+  }
+  return active;
 }
 
 async function savePendingEntregas(arr) {
   await kv.set('pending-entregas', JSON.stringify(arr));
+  logDebug(`[KV SAVE] Guardado pending-entregas: ${arr.length} items`);
 }
 
 async function loadConfirmed() {
   const json = await kv.get('confirmed');
-  logDebug(`DEBUG loadConfirmed: Raw ${JSON.stringify(json)}`);  // Para logs
-  return json ? JSON.parse(json) : [];
+  logDebug(`DEBUG loadConfirmed: Raw ${JSON.stringify(json)}`);
+  let arr = [];
+  if (json) {
+    try {
+      if (typeof json === 'string') {
+        arr = JSON.parse(json);
+      } else if (typeof json === 'object' && json !== null) {
+        arr = json;
+      }
+    } catch (e) {
+      logDebug(`[KV ERROR] Parse confirmed falló: ${e.message} - Reseteando a []`);
+      arr = [];
+    }
+  }
+  return arr;
 }
 
 async function saveConfirmed(arr) {
@@ -109,7 +139,7 @@ app.get('/generate-token', async (req, res) => {
   try {
     productosParsed = JSON.parse(decodeURIComponent(productos));
   } catch (e) {
-    logDebug(`[ERROR] Parse productos: ${e} - Usando []`);  // Log mejorado
+    logDebug(`[ERROR] Parse productos: ${e} - Usando []`);
     productosParsed = [];
   }
   const entregas = await loadPendingEntregas();
@@ -125,7 +155,7 @@ app.get('/generate-token', async (req, res) => {
   });
   await savePendingEntregas(entregas);
   
-  // Delay temporal para KV sync (opcional, quítalo después)
+  // Delay temporal para KV sync (opcional, quítalo después si no hace falta)
   await new Promise(resolve => setTimeout(resolve, 500));
   
   logDebug(`[DEBUG] Post-save: Verificando token ${token} en entregas...`);
