@@ -181,11 +181,11 @@
       listaDetallesEl.innerHTML = `
         <li><strong>Cliente:</strong> ${entrega.cliente}</li>
         <li><strong>Ruta:</strong> ${entrega.ruta}</li>
-        ${entrega.productos && entrega.productos.length > 0 ? 
-          `<li><strong>Productos a entregar:</strong></li>
-           ${entrega.productos.map(p => `<li>${p.cantidad} ${p.nombre}</li>`).join('')}` : 
-          '<li><strong>Productos:</strong> Sin productos especificados</li>'
-        }
+       ${entrega.productos && entrega.productos.length > 0 ? 
+  `<li><strong>Productos a entregar:</strong></li>
+   <ul style="margin-left: 20px;">${entrega.productos.map(p => `<li>${p.cantidad} ${p.nombre}</li>`).join('')}</ul>` : 
+  '<li><strong>Productos:</strong> Sin productos especificados</li>'
+}
       `;
       detallesEl.style.display = 'block';
     } catch (error) {

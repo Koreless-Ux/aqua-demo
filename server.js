@@ -2,10 +2,24 @@ const express = require('express');
 const QRCode = require('qrcode');
 const path = require('path');
 const puppeteer = require('puppeteer');
-const { kv } = require('@vercel/kv');  // NUEVO: Import para Vercel KV
+const mockKV = {
+  data: { 'pending-entregas': '[]', 'confirmed': '[]' },
+  async get(key) {
+    console.log(`[Mock KV GET] ${key}: ${this.data[key]}`);
+    return this.data[key];
+  },
+  async set(key, value) {
+    console.log(`[Mock KV SET] ${key}: ${value}`);
+    this.data[key] = value;
+  },
+  async del(key) {
+    console.log(`[Mock KV DEL] ${key}`);
+    delete this.data[key];
+  }
+};
+const kv = mockKV;  // Usa mock local
 const app = express();
 app.set('trust proxy', true);
-// app.use(express.static('public'));  // COMENTADO: Ignorado en Vercel, usa CDN para /public
 app.use(express.json());
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
@@ -15,20 +29,25 @@ function logDebug(mensaje) {
 }
 
 function formatearFecha(fechaISO) {
-  const fecha = new Date(fechaISO);
-  const opciones = {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: 'America/Bogota' 
-  };
-  return fecha.toLocaleDateString('es-BO', opciones); 
+  try {
+    const fecha = new Date(fechaISO);
+    if (isNaN(fecha.getTime())) return 'Fecha inválida';
+    const opciones = {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'America/Bogota' 
+    };
+    return fecha.toLocaleDateString('es-BO', opciones); 
+  } catch (e) {
+    return 'Fecha inválida';
+  }
 }
 
-// NUEVO: Funciones helper para KV (persistente y con limpieza de expirados)
+// Helpers KV (persistente)
 async function loadPendingEntregas() {
   const json = await kv.get('pending-entregas');
   if (json) {
@@ -36,8 +55,8 @@ async function loadPendingEntregas() {
     const now = Date.now();
     const active = arr.filter(e => !e.asistido && now < e.expira);
     if (active.length !== arr.length) {
-      await savePendingEntregas(active);  // Limpia expirados/asistidos automáticamente
-      logDebug(`Limpieza KV: ${arr.length - active.length} tokens removidos. Activos: ${active.length}`);
+      await savePendingEntregas(active);
+      logDebug(`Limpieza KV: Removidos ${arr.length - active.length}. Activos: ${active.length}`);
     }
     return active;
   }
@@ -50,7 +69,7 @@ async function savePendingEntregas(arr) {
 
 async function loadConfirmed() {
   const json = await kv.get('confirmed');
-  logDebug(`DEBUG loadConfirmed: Raw JSON ${JSON.stringify(json)}`);  // Para logs
+  logDebug(`DEBUG loadConfirmed: Raw ${JSON.stringify(json)}`);  // Para logs
   return json ? JSON.parse(json) : [];
 }
 
@@ -58,7 +77,6 @@ async function saveConfirmed(arr) {
   await kv.set('confirmed', JSON.stringify(arr));
 }
 
-// NUEVO: Agregar confirmación a KV (sin fs)
 async function agregarConfirmacion(cliente, ruta, fechaISO, productos = []) {
   const timestamp = new Date().toISOString();
   const productosStr = productos.map(p => `${p.cantidad} ${p.nombre}`).join(', ');
@@ -72,52 +90,29 @@ async function agregarConfirmacion(cliente, ruta, fechaISO, productos = []) {
   const confirmed = await loadConfirmed();
   confirmed.push(newConf);
   await saveConfirmed(confirmed);
-  logDebug(`Confirmación guardada en KV: ${cliente} | Ruta: ${ruta} | Productos: ${productosStr}`);
+  logDebug(`Confirmación guardada KV: ${cliente} | Ruta: ${ruta} | Productos: ${productosStr}`);
 }
 
 app.get('/', (req, res) => {
-  const filePath = path.join(__dirname, 'public', 'admin.html');
-  res.type('text/html'); 
-  res.sendFile(filePath);
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// Rutas explícitas para HTML (funcionan en Vercel)
-app.get('/cliente.html', (req, res) => {
-  try {
-    res.sendFile(path.join(__dirname, 'public', 'cliente.html'));
-  } catch (e) {
-    console.log('Error sirviendo cliente.html:', e);
-    res.status(404).send('Archivo no encontrado');
-  }
-});
-app.get('/confirmar.html', (req, res) => {
-  try {
-    res.sendFile(path.join(__dirname, 'public', 'confirmar.html'));
-  } catch (e) {
-    console.log('Error sirviendo confirmar.html:', e);
-    res.status(404).send('Archivo no encontrado');
-  }
-});
-app.get('/admin.html', (req, res) => {
-  try {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-  } catch (e) {
-    console.log('Error sirviendo admin.html:', e);
-    res.status(404).send('Archivo no encontrado');
-  }
-});
+app.get('/cliente.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'cliente.html')));
+app.get('/confirmar.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'confirmar.html')));
+app.get('/admin.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
-app.get('/generate-token', async (req, res) => {  // ASYNC: NUEVO
+app.get('/generate-token', async (req, res) => {
   const { cliente = 'Cliente Test', ruta = 'Ruta Test', productos = '[]' } = req.query;
-  const token = Math.random().toString(36).substring(7); 
-  const expira = Date.now() + 24 * 60 * 60 * 1000;  // 24 horas
+const crypto = require('crypto');
+const token = crypto.randomBytes(16).toString('hex');  // 32 chars, más seguro
+  const expira = Date.now() + 24 * 60 * 60 * 1000;
   let productosParsed = [];
   try {
     productosParsed = JSON.parse(decodeURIComponent(productos));
   } catch (e) {
     console.log('Error parseando productos:', e);
   }
-  const entregas = await loadPendingEntregas();  // NUEVO: Carga desde KV
+  const entregas = await loadPendingEntregas();
   entregas.push({ 
     id: Date.now(), 
     token, 
@@ -128,29 +123,27 @@ app.get('/generate-token', async (req, res) => {  // ASYNC: NUEVO
     asistido: false, 
     llegada: null 
   });
-  await savePendingEntregas(entregas);  // NUEVO: Guarda en KV
+  await savePendingEntregas(entregas);
    
   const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `${req.protocol}://${req.get('host')}`;
   const urlCliente = `${baseUrl}/cliente.html?token=${token}`;
   
-  const logMsg = `Token generado: ${token} | Cliente: ${cliente} | Ruta: ${ruta} | Productos: ${JSON.stringify(productosParsed)} | Expira: ${new Date(expira).toISOString()} | BaseURL: ${baseUrl}`;
-  logDebug(logMsg); 
-  
+  logDebug(`Token generado: ${token} | Cliente: ${cliente} | Ruta: ${ruta} | Expira: ${new Date(expira).toISOString()}`);
   res.json({ token, urlCliente }); 
 });
 
-app.get('/generar-qr/:cliente/:ruta', async (req, res) => {  // ASYNC: NUEVO
+app.get('/generar-qr/:cliente/:ruta', async (req, res) => {
   const { cliente, ruta } = req.params;
   const { productos = '[]' } = req.query;
   const token = Math.random().toString(36).substring(7); 
-  const expira = Date.now() + 24 * 60 * 60 * 1000;  // 24 horas
+  const expira = Date.now() + 24 * 60 * 60 * 1000;
   let productosParsed = [];
   try {
     productosParsed = JSON.parse(decodeURIComponent(productos));
   } catch (e) {
     console.log('Error parseando productos:', e);
   }
-  const entregas = await loadPendingEntregas();  // NUEVO: Carga desde KV
+  const entregas = await loadPendingEntregas();
   entregas.push({ 
     id: Date.now(), 
     token, 
@@ -161,41 +154,30 @@ app.get('/generar-qr/:cliente/:ruta', async (req, res) => {  // ASYNC: NUEVO
     asistido: false,
     llegada: null
   });
-  await savePendingEntregas(entregas);  // NUEVO: Guarda en KV
+  await savePendingEntregas(entregas);
   
   const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `${req.protocol}://${req.get('host')}`;
   const urlCliente = `${baseUrl}/cliente.html?token=${token}`;
   
-  const logMsg = `Token generado: ${token} | Cliente: ${cliente} | Ruta: ${ruta} | Productos: ${JSON.stringify(productosParsed)} | Expira: ${new Date(expira).toISOString()} | BaseURL: ${baseUrl}`;
-  logDebug(logMsg);
-  
+  logDebug(`QR token: ${token} | Cliente: ${cliente} | Ruta: ${ruta} | Expira: ${new Date(expira).toISOString()}`);
   res.json({ token, urlCliente }); 
 });
 
-app.get('/qr-image/:token', async (req, res) => {  // ASYNC: NUEVO
+app.get('/qr-image/:token', async (req, res) => {
   const { token } = req.params;
-  const userAgentShort = req.headers['user-agent']?.substring(0, 30) || 'Unknown';
-  logDebug(`Solicitando QR para token: ${token} | User-Agent: ${userAgentShort}`);
+  logDebug(`Solicitando QR para token: ${token}`);
   
-  const entregas = await loadPendingEntregas();  // NUEVO: Carga desde KV
+  const entregas = await loadPendingEntregas();
   const entrega = entregas.find(e => e.token === token);
   let reason = '';
-  if (!entrega) {
-    reason = 'no token match';
-  } else if (entrega.asistido) {
-    reason = 'already asistido';
-  } else if (Date.now() >= entrega.expira) {
-    reason = 'expired';
-  }
+  if (!entrega) reason = 'no token match';
+  else if (entrega.asistido) reason = 'already asistido';
+  else if (Date.now() >= entrega.expira) reason = 'expired';
   
   if (!entrega || reason) {
-    const logMsg = `ERROR: ${reason || 'unknown'}: ${token} | Tokens activos: ${entregas.length}`;
-    logDebug(logMsg);
+    logDebug(`ERROR QR: ${reason}: ${token}`);
     return res.status(404).send('Expirado, ya usado o inválido');
   }
-  
-  const logMsgOK = `Token OK: ${entrega.cliente} | Expira: ${new Date(entrega.expira).toISOString()}`;
-  logDebug(logMsgOK);
   
   const timestamp = Date.now();
   const subToken = Buffer.from(token + timestamp).toString('base64').substring(0, 10); 
@@ -203,55 +185,50 @@ app.get('/qr-image/:token', async (req, res) => {  // ASYNC: NUEVO
   const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `${req.protocol}://${req.get('host')}`;
   const data = `${baseUrl}/confirmar.html?token=${token}&subToken=${subToken}&timestamp=${timestamp}`;
   
-  const logMsgQR = `QR data URL generada: ${data}`;
-  logDebug(logMsgQR);
+  logDebug(`QR data: ${data}`);
   
   const qr = await QRCode.toDataURL(data);
   res.send(qr);
 });
 
-app.post('/confirmar-sub', async (req, res) => {  // ASYNC: NUEVO
+app.post('/confirmar-sub', async (req, res) => {
   const { subToken, timestamp, mainToken } = req.body;  
 
   if (!mainToken || mainToken === 'undefined' || mainToken.trim() === '') {
-    const logMsg = 'Error: mainToken undefined o vacío en POST body';
-    logDebug(logMsg);
-    return res.json({ ok: false, msg: 'Token requerido (verifica QR y URL)' });
+    logDebug('Error: mainToken vacío en POST');
+    return res.json({ ok: false, msg: 'Token requerido' });
   }
   
   logDebug(`Confirmando: token=${mainToken}, subToken=${subToken}, timestamp=${timestamp}`);
   
   const expectedSub = Buffer.from(mainToken + timestamp).toString('base64').substring(0, 10);
   if (subToken !== expectedSub || Date.now() > (parseInt(timestamp) + 24 * 60 * 60 * 1000)) {
-    const logMsg = `Sub inválido: ${subToken} vs ${expectedSub} | Timestamp: ${timestamp} | Diferencia: ${(Date.now() - parseInt(timestamp)) / 1000}s`;
-    logDebug(logMsg);
-    return res.json({ ok: false, msg: 'Sub-token inválido o expirado (regenera QR)' });
+    logDebug(`Sub inválido: ${subToken} vs ${expectedSub}`);
+    return res.json({ ok: false, msg: 'Sub-token inválido o expirado' });
   }
   
-  const entregas = await loadPendingEntregas();  // NUEVO: Carga desde KV
+  const entregas = await loadPendingEntregas();
   const entrega = entregas.find(e => e.token === mainToken && !e.asistido && Date.now() < e.expira);
   if (!entrega) {
-    const logMsg = `Entrega no encontrada para ${mainToken} | Tokens activos: ${entregas.length}`;
-    logDebug(logMsg);
+    logDebug(`Entrega no encontrada para ${mainToken}`);
     return res.json({ ok: false, msg: 'Token expirado o ya usado' });
   }
   
   entrega.asistido = true;
   entrega.llegada = new Date().toISOString();
-  await savePendingEntregas(entregas);  // NUEVO: Guarda pending (ahora con asistido=true, se filtrará después)
+  await savePendingEntregas(entregas);
   
-  // NUEVO: Mueve a confirmed y log
   await agregarConfirmacion(entrega.cliente, entrega.ruta, entrega.llegada, entrega.productos);
   
   res.json({ ok: true, msg: `¡Asistencia confirmada para ${entrega.cliente} en ruta ${entrega.ruta}! Productos: ${entrega.productos.map(p => `${p.cantidad} ${p.nombre}`).join(', ')}` });
 });
 
-app.get('/asistencias', async (req, res) => {  // ASYNC: NUEVO
-  const confirmed = await loadConfirmed();  // NUEVO: De historial confirmado
-  const asistidas = confirmed.map(conf => ({  // Mapea al formato viejo
+app.get('/asistencias', async (req, res) => {
+  const confirmed = await loadConfirmed();
+  const asistidas = confirmed.map(conf => ({
     cliente: conf.cliente,
     ruta: conf.ruta,
-    productos: conf.productosStr ? conf.productosStr.split(', ').map(str => {  // Parsea simple si es string
+    productos: conf.productosStr ? conf.productosStr.split(', ').map(str => {
       const [cant, ...nom] = str.split(' ');
       return { cantidad: cant, nombre: nom.join(' ') };
     }) : [],
@@ -260,83 +237,82 @@ app.get('/asistencias', async (req, res) => {  // ASYNC: NUEVO
   res.json(asistidas);
 });
 
-// Endpoint para debug: lista tokens activos
+app.get('/debug-tokens', async (req, res) => {
+  const entregas = await loadPendingEntregas();
+  res.json(entregas.map(e => ({ 
+    token: e.token, 
+    cliente: e.cliente, 
+    productos: e.productos,
+    expira: new Date(e.expira), 
+    asistido: e.asistido 
+  })));
+});
+
 app.get('/finalizar-pdf', async (req, res) => {
   try {
-    logDebug('DEBUG PDF: Iniciando carga de KV');
+    logDebug('DEBUG PDF: Iniciando');
     const rawConfirmed = await kv.get('confirmed');
-    logDebug(`DEBUG PDF: Raw KV 'confirmed': ${JSON.stringify(rawConfirmed)}`);  // Para ver si hay data
+    logDebug(`DEBUG PDF: Raw KV: ${JSON.stringify(rawConfirmed)}`);
 
-    const confirmaciones = await loadConfirmed();  // Función helper KV
-    logDebug(`DEBUG PDF: Confirmaciones parseadas: ${confirmaciones.length}`);  // Count
+    const confirmaciones = await loadConfirmed();
+    logDebug(`DEBUG PDF: Length: ${confirmaciones.length}`);
 
     if (confirmaciones.length === 0) {
-      logDebug('DEBUG PDF: 0 confirmaciones - abort');
+      logDebug('DEBUG PDF: Vacío - abort');
       return res.status(400).send('No hay confirmaciones para generar PDF. (Genera una asistencia primero).');
     }
 
-    logDebug(`DEBUG PDF: Generando PDF con ${confirmaciones.length} entradas`);
-    const browser = await puppeteer.launch({ headless: true });
-    const page = await browser.newPage();
-
+    logDebug(`DEBUG PDF: Generando con ${confirmaciones.length}`);
+    let browser;
+if (process.env.VERCEL_URL) {
+  // Prod: Usa chromium serverless
+  browser = await puppeteer.launch({
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
+    ignoreHTTPSErrors: true,
+  });
+} else {
+  // Local: Usa full Puppeteer con Chrome embebido
+  browser = await puppeteer.launch({ 
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']  // Fix común para local
+  });
+}
+const page = await browser.newPage();
     const html = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
-          <title>Reporte de Confirmaciones de Asistencia</title>
+          <title>Reporte de Confirmaciones</title>
           <style>
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 20px; 
-              background-color: #042b17ff;
-              color: #ffffffff;
-            }
-            h1 { 
-              text-align: center; 
-              color: #ffffffff;
-            }
-            table { 
-              width: 100%; 
-              border-collapse: collapse; 
-              background-color: #082519ff;
-            }
-            th, td { 
-              border: 1px solid #ffffffff;
-              padding: 8px; 
-              text-align: left; 
-              color: #ffffffff;
-            }
-            th { 
-              background-color: #042b17ff;
-              font-weight: bold; 
-            }
+            body { font-family: Arial, sans-serif; margin: 20px; background-color: #042b17ff; color: #ffffffff; }
+            h1 { text-align: center; color: #ffffffff; }
+            table { width: 100%; border-collapse: collapse; background-color: #082519ff; }
+            th, td { border: 1px solid #ffffffff; padding: 8px; text-align: left; color: #ffffffff; }
+            th { background-color: #042b17ff; font-weight: bold; }
             .cliente { width: 25%; }
             .ruta { width: 20%; }
             .productos { width: 35%; }
             .fecha { width: 20%; }
-            tr:nth-child(even) { 
-              background-color: #052913ff;
-            }
-            tr:nth-child(odd) { 
-              background-color: #082519ff;
-            }
-            p { 
-              color: #ffffffff;
-            }
+            tr:nth-child(even) { background-color: #052913ff; }
+            tr:nth-child(odd) { background-color: #082519ff; }
+            p { color: #ffffffff; }
           </style>
         </head>
         <body>
-          <h1>Reporte de Confirmaciones de Asistencia (Acumulado por Clientes)</h1>
-          <p><strong>Total confirmaciones:</strong> ${confirmaciones.length}</p>
-          <p><strong>Última actualización:</strong> ${new Date().toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' })}</p>
+          <h1>Reporte de Confirmaciones</h1>
+          <p><strong>Total:</strong> ${confirmaciones.length}</p>
+          <p><strong>Actualización:</strong> ${new Date().toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' })}</p>
           <table>
             <thead>
               <tr>
                 <th class="cliente">Cliente</th>
-                <th class="ruta">Ruta (Camión)</th>
-                <th class="productos">Productos Entregados</th>
-                <th class="fecha">Hora de Confirmación</th>
+                <th class="ruta">Ruta</th>
+                <th class="productos">Productos</th>
+                <th class="fecha">Hora</th>
               </tr>
             </thead>
             <tbody>
@@ -350,7 +326,7 @@ app.get('/finalizar-pdf', async (req, res) => {
               `).reverse().join('')}
             </tbody>
           </table>
-          <p><strong>Fin de reporte.</strong> </p>
+          <p><strong>Fin.</strong></p>
         </body>
       </html>
     `;
@@ -365,24 +341,21 @@ app.get('/finalizar-pdf', async (req, res) => {
     await browser.close();
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=reporte-confirmaciones-${new Date().toISOString().split('T')[0]}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=reporte-${new Date().toISOString().split('T')[0]}.pdf`);
     res.send(pdfBuffer);
 
-    logDebug(`PDF generado exitoso desde KV (${confirmaciones.length} confirmaciones).`);
+    logDebug(`PDF exitoso (${confirmaciones.length})`);
   } catch (error) {
     logDebug(`ERROR PDF: ${error.message}`);
-    res.status(500).send('Error al generar PDF: ' + error.message);
+    res.status(500).send('Error PDF: ' + error.message);
   }
 });
 
-// NUEVO: Endpoint para obtener detalles de entrega por token
-app.get('/get-entrega/:token', async (req, res) => {  // ASYNC: NUEVO
+app.get('/get-entrega/:token', async (req, res) => {
   const { token } = req.params;
-  const entregas = await loadPendingEntregas();  // NUEVO: De KV
+  const entregas = await loadPendingEntregas();
   const entrega = entregas.find(e => e.token === token && !e.asistido && Date.now() < e.expira);
-  if (!entrega) {
-    return res.status(404).json({ error: 'Token inválido o expirado' });
-  }
+  if (!entrega) return res.status(404).json({ error: 'Token inválido' });
   res.json({
     cliente: entrega.cliente,
     ruta: entrega.ruta,
@@ -390,19 +363,15 @@ app.get('/get-entrega/:token', async (req, res) => {  // ASYNC: NUEVO
   });
 });
 
-// NUEVO: Endpoint para borrar confirmed (reinicia reporte)
-app.delete('/borrar-logs', async (req, res) => {  // ASYNC: NUEVO
+app.delete('/borrar-logs', async (req, res) => {
   await kv.del('confirmed');
-  logDebug('Confirmaciones borradas de KV.');
-  return res.json({ ok: true, msg: 'Reporte reiniciado.' });
+  logDebug('Borrado KV confirmed');
+  res.json({ ok: true, msg: 'Reiniciado' });
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor en puerto ${PORT}`);
-  console.log('Debug: Ve a /debug-tokens para ver tokens activos');
-  console.log('Nuevo: Ve a /finalizar-pdf para generar PDF desde KV');
 });
 
-// NUEVO: Export para Vercel
 module.exports = app;
