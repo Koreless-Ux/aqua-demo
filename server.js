@@ -1,23 +1,20 @@
 const express = require('express');
 const QRCode = require('qrcode');
 const path = require('path');
-const puppeteer = require('puppeteer');
-const mockKV = {
-  data: { 'pending-entregas': '[]', 'confirmed': '[]' },
-  async get(key) {
-    console.log(`[Mock KV GET] ${key}: ${this.data[key]}`);
-    return this.data[key];
-  },
-  async set(key, value) {
-    console.log(`[Mock KV SET] ${key}: ${value}`);
-    this.data[key] = value;
-  },
-  async del(key) {
-    console.log(`[Mock KV DEL] ${key}`);
-    delete this.data[key];
-  }
-};
-const kv = mockKV;  // Usa mock local
+const crypto = require('crypto');  // Para tokens seguros en todas las rutas
+
+// Puppeteer condicional: full para local, core + chromium para Vercel
+let puppeteer, chromium;
+if (process.env.VERCEL_URL) {
+  // Prod: Serverless
+  puppeteer = require('puppeteer-core');
+  chromium = require('@sparticuz/chromium');
+} else {
+  // Local: Full con Chrome embebido
+  puppeteer = require('puppeteer');
+}
+const { kv } = require('@vercel/kv');  // KV real (sin mock)
+
 const app = express();
 app.set('trust proxy', true);
 app.use(express.json());
@@ -41,7 +38,7 @@ function formatearFecha(fechaISO) {
       hour12: true,
       timeZone: 'America/Bogota' 
     };
-    return fecha.toLocaleDateString('es-BO', opciones); 
+    return fecha.toLocaleDateString('es-CO', opciones);  // Uniformizado a es-CO
   } catch (e) {
     return 'Fecha inválida';
   }
@@ -49,11 +46,14 @@ function formatearFecha(fechaISO) {
 
 // Helpers KV (persistente)
 async function loadPendingEntregas() {
+  logDebug('[KV DEBUG] Cargando pending-entregas con Vercel KV');  // Log para debug
   const json = await kv.get('pending-entregas');
+  logDebug(`[KV DEBUG] Raw json from get: ${json ? 'OK (' + (typeof json === 'string' ? json.length : 'object') + ' chars)' : 'NULL - No data yet'}`);
   if (json) {
     const arr = JSON.parse(json);
     const now = Date.now();
     const active = arr.filter(e => !e.asistido && now < e.expira);
+    logDebug(`[KV LOAD] Filtrando: ${arr.length} total -> ${active.length} activos. Removidos: ${arr.length - active.length} (expirados/usados)`);
     if (active.length !== arr.length) {
       await savePendingEntregas(active);
       logDebug(`Limpieza KV: Removidos ${arr.length - active.length}. Activos: ${active.length}`);
@@ -103,14 +103,14 @@ app.get('/admin.html', (req, res) => res.sendFile(path.join(__dirname, 'public',
 
 app.get('/generate-token', async (req, res) => {
   const { cliente = 'Cliente Test', ruta = 'Ruta Test', productos = '[]' } = req.query;
-const crypto = require('crypto');
-const token = crypto.randomBytes(16).toString('hex');  // 32 chars, más seguro
+  const token = crypto.randomBytes(16).toString('hex');  // 32 chars, más seguro
   const expira = Date.now() + 24 * 60 * 60 * 1000;
   let productosParsed = [];
   try {
     productosParsed = JSON.parse(decodeURIComponent(productos));
   } catch (e) {
-    console.log('Error parseando productos:', e);
+    logDebug(`[ERROR] Parse productos: ${e} - Usando []`);  // Log mejorado
+    productosParsed = [];
   }
   const entregas = await loadPendingEntregas();
   entregas.push({ 
@@ -124,6 +124,18 @@ const token = crypto.randomBytes(16).toString('hex');  // 32 chars, más seguro
     llegada: null 
   });
   await savePendingEntregas(entregas);
+  
+  // Delay temporal para KV sync (opcional, quítalo después)
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  logDebug(`[DEBUG] Post-save: Verificando token ${token} en entregas...`);
+  const verify = await loadPendingEntregas();  // Recarga para check
+  const found = verify.find(e => e.token === token);
+  if (!found) {
+    logDebug(`[ERROR] Token ${token} NO se guardó en KV!`);
+  } else {
+    logDebug(`[OK] Token ${token} guardado: expira ${new Date(found.expira).toISOString()}`);
+  }
    
   const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `${req.protocol}://${req.get('host')}`;
   const urlCliente = `${baseUrl}/cliente.html?token=${token}`;
@@ -135,13 +147,14 @@ const token = crypto.randomBytes(16).toString('hex');  // 32 chars, más seguro
 app.get('/generar-qr/:cliente/:ruta', async (req, res) => {
   const { cliente, ruta } = req.params;
   const { productos = '[]' } = req.query;
-  const token = Math.random().toString(36).substring(7); 
+  const token = crypto.randomBytes(16).toString('hex');  // Uniformizado con crypto
   const expira = Date.now() + 24 * 60 * 60 * 1000;
   let productosParsed = [];
   try {
     productosParsed = JSON.parse(decodeURIComponent(productos));
   } catch (e) {
-    console.log('Error parseando productos:', e);
+    logDebug(`[ERROR] Parse productos: ${e} - Usando []`);
+    productosParsed = [];
   }
   const entregas = await loadPendingEntregas();
   entregas.push({ 
@@ -156,6 +169,18 @@ app.get('/generar-qr/:cliente/:ruta', async (req, res) => {
   });
   await savePendingEntregas(entregas);
   
+  // Delay temporal para KV sync
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  logDebug(`[DEBUG] Post-save: Verificando token ${token} en entregas...`);
+  const verify = await loadPendingEntregas();
+  const found = verify.find(e => e.token === token);
+  if (!found) {
+    logDebug(`[ERROR] Token ${token} NO se guardó en KV!`);
+  } else {
+    logDebug(`[OK] Token ${token} guardado: expira ${new Date(found.expira).toISOString()}`);
+  }
+  
   const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `${req.protocol}://${req.get('host')}`;
   const urlCliente = `${baseUrl}/cliente.html?token=${token}`;
   
@@ -168,11 +193,16 @@ app.get('/qr-image/:token', async (req, res) => {
   logDebug(`Solicitando QR para token: ${token}`);
   
   const entregas = await loadPendingEntregas();
+  logDebug(`[DEBUG QR] Buscando token ${token}: ${entregas.length} pendientes total`);
   const entrega = entregas.find(e => e.token === token);
   let reason = '';
-  if (!entrega) reason = 'no token match';
-  else if (entrega.asistido) reason = 'already asistido';
-  else if (Date.now() >= entrega.expira) reason = 'expired';
+  if (!entrega) { 
+    reason = 'no token match - Entregas vacías o no match'; 
+    logDebug(`[ERROR QR] ${reason} para ${token}. Entregas tokens: ${entregas.map(e => e.token).join(', ')}`);
+  } else if (entrega.asistido) { reason = 'already asistido'; }
+  else if (Date.now() >= entrega.expira) { 
+    reason = `expired - now ${Date.now()} vs expira ${entrega.expira}`; 
+  }
   
   if (!entrega || reason) {
     logDebug(`ERROR QR: ${reason}: ${token}`);
@@ -243,7 +273,7 @@ app.get('/debug-tokens', async (req, res) => {
     token: e.token, 
     cliente: e.cliente, 
     productos: e.productos,
-    expira: new Date(e.expira), 
+    expira: new Date(e.expira).toISOString(),  // Formato legible
     asistido: e.asistido 
   })));
 });
@@ -264,23 +294,23 @@ app.get('/finalizar-pdf', async (req, res) => {
 
     logDebug(`DEBUG PDF: Generando con ${confirmaciones.length}`);
     let browser;
-if (process.env.VERCEL_URL) {
-  // Prod: Usa chromium serverless
-  browser = await puppeteer.launch({
-    args: chromium.args,
-    defaultViewport: chromium.defaultViewport,
-    executablePath: await chromium.executablePath(),
-    headless: chromium.headless,
-    ignoreHTTPSErrors: true,
-  });
-} else {
-  // Local: Usa full Puppeteer con Chrome embebido
-  browser = await puppeteer.launch({ 
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']  // Fix común para local
-  });
-}
-const page = await browser.newPage();
+    if (process.env.VERCEL_URL) {
+      // Prod: Usa chromium serverless
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
+        ignoreHTTPSErrors: true,
+      });
+    } else {
+      // Local: Usa full Puppeteer con Chrome embebido
+      browser = await puppeteer.launch({ 
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']  // Fix común para local
+      });
+    }
+    const page = await browser.newPage();
     const html = `
       <!DOCTYPE html>
       <html>
