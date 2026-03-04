@@ -13,7 +13,16 @@ if (process.env.VERCEL_URL) {
   // Local: Full con Chrome embebido
   puppeteer = require('puppeteer');
 }
-const { kv } = require('@vercel/kv');  // KV real (sin mock)
+
+// ¡Cambio clave! Usamos @upstash/redis en vez de @vercel/kv
+const { Redis } = require('@upstash/redis');
+
+// Inicializamos Redis con las variables que Vercel inyecta automáticamente
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+  // Si en tus env vars ves UPSTASH_REDIS_REST_URL y UPSTASH_REDIS_REST_TOKEN, cámbialas por esas
+});
 
 const app = express();
 app.set('trust proxy', true);
@@ -44,67 +53,85 @@ function formatearFecha(fechaISO) {
   }
 }
 
-// Helpers KV (persistente)
+// Helpers Redis (persistente)
 async function loadPendingEntregas() {
-  logDebug('[KV DEBUG] Cargando pending-entregas con Vercel KV');
-  const json = await kv.get('pending-entregas');
-  logDebug(`[KV DEBUG] Raw json from get: ${json ? (typeof json === 'string' ? 'String OK (' + json.length + ' chars)' : 'Object OK - Usando directo') : 'NULL - No data yet'}`);
-  
-  let arr = [];
-  if (json) {
-    try {
-      if (typeof json === 'string') {
-        arr = JSON.parse(json);
-      } else if (typeof json === 'object' && json !== null) {
-        // Si es object (data corrupta vieja), úsalo directo pero log warning
-        logDebug('[KV WARNING] json es object - Usando directo (limpia KV después)');
-        arr = json;
-      } else {
-        throw new Error('Tipo inválido');
+  logDebug('[REDIS DEBUG] Cargando pending-entregas con Upstash Redis');
+  try {
+    const json = await redis.get('pending-entregas');
+    logDebug(`[REDIS DEBUG] Raw json from get: ${json ? (typeof json === 'string' ? 'String OK (' + json.length + ' chars)' : 'Object OK - Usando directo') : 'NULL - No data yet'}`);
+    
+    let arr = [];
+    if (json) {
+      try {
+        if (typeof json === 'string') {
+          arr = JSON.parse(json);
+        } else if (typeof json === 'object' && json !== null) {
+          // Si es object (data corrupta vieja), úsalo directo pero log warning
+          logDebug('[REDIS WARNING] json es object - Usando directo (limpia Redis después)');
+          arr = json;
+        } else {
+          throw new Error('Tipo inválido');
+        }
+      } catch (e) {
+        logDebug(`[REDIS ERROR] Parse falló: ${e.message} - Reseteando a []`);
+        arr = [];
       }
-    } catch (e) {
-      logDebug(`[KV ERROR] Parse falló: ${e.message} - Reseteando a []`);
-      arr = [];
     }
+    
+    const now = Date.now();
+    const active = arr.filter(e => !e.asistido && now < e.expira);
+    logDebug(`[REDIS LOAD] Filtrando: ${arr.length} total -> ${active.length} activos. Removidos: ${arr.length - active.length} (expirados/usados)`);
+    
+    if (active.length !== arr.length) {
+      await savePendingEntregas(active);
+      logDebug(`Limpieza Redis: Removidos ${arr.length - active.length}. Activos: ${active.length}`);
+    }
+    return active;
+  } catch (err) {
+    logDebug(`[REDIS CRITICAL ERROR] Falló loadPendingEntregas: ${err.message}`);
+    return []; // Fallback graceful: devuelve vacío para no romper la app
   }
-  
-  const now = Date.now();
-  const active = arr.filter(e => !e.asistido && now < e.expira);
-  logDebug(`[KV LOAD] Filtrando: ${arr.length} total -> ${active.length} activos. Removidos: ${arr.length - active.length} (expirados/usados)`);
-  
-  if (active.length !== arr.length) {
-    await savePendingEntregas(active);
-    logDebug(`Limpieza KV: Removidos ${arr.length - active.length}. Activos: ${active.length}`);
-  }
-  return active;
 }
 
 async function savePendingEntregas(arr) {
-  await kv.set('pending-entregas', JSON.stringify(arr));
-  logDebug(`[KV SAVE] Guardado pending-entregas: ${arr.length} items`);
+  try {
+    await redis.set('pending-entregas', JSON.stringify(arr));
+    logDebug(`[REDIS SAVE] Guardado pending-entregas: ${arr.length} items`);
+  } catch (err) {
+    logDebug(`[REDIS ERROR] Falló savePendingEntregas: ${err.message}`);
+  }
 }
 
 async function loadConfirmed() {
-  const json = await kv.get('confirmed');
-  logDebug(`DEBUG loadConfirmed: Raw ${JSON.stringify(json)}`);
-  let arr = [];
-  if (json) {
-    try {
-      if (typeof json === 'string') {
-        arr = JSON.parse(json);
-      } else if (typeof json === 'object' && json !== null) {
-        arr = json;
+  try {
+    const json = await redis.get('confirmed');
+    logDebug(`DEBUG loadConfirmed: Raw ${JSON.stringify(json)}`);
+    let arr = [];
+    if (json) {
+      try {
+        if (typeof json === 'string') {
+          arr = JSON.parse(json);
+        } else if (typeof json === 'object' && json !== null) {
+          arr = json;
+        }
+      } catch (e) {
+        logDebug(`[REDIS ERROR] Parse confirmed falló: ${e.message} - Reseteando a []`);
+        arr = [];
       }
-    } catch (e) {
-      logDebug(`[KV ERROR] Parse confirmed falló: ${e.message} - Reseteando a []`);
-      arr = [];
     }
+    return arr;
+  } catch (err) {
+    logDebug(`[REDIS ERROR] Falló loadConfirmed: ${err.message}`);
+    return [];
   }
-  return arr;
 }
 
 async function saveConfirmed(arr) {
-  await kv.set('confirmed', JSON.stringify(arr));
+  try {
+    await redis.set('confirmed', JSON.stringify(arr));
+  } catch (err) {
+    logDebug(`[REDIS ERROR] Falló saveConfirmed: ${err.message}`);
+  }
 }
 
 async function agregarConfirmacion(cliente, ruta, fechaISO, productos = []) {
@@ -120,7 +147,7 @@ async function agregarConfirmacion(cliente, ruta, fechaISO, productos = []) {
   const confirmed = await loadConfirmed();
   confirmed.push(newConf);
   await saveConfirmed(confirmed);
-  logDebug(`Confirmación guardada KV: ${cliente} | Ruta: ${ruta} | Productos: ${productosStr}`);
+  logDebug(`Confirmación guardada Redis: ${cliente} | Ruta: ${ruta} | Productos: ${productosStr}`);
 }
 
 app.get('/', (req, res) => {
@@ -155,14 +182,14 @@ app.get('/generate-token', async (req, res) => {
   });
   await savePendingEntregas(entregas);
   
-  // Delay temporal para KV sync (opcional, quítalo después si no hace falta)
+  // Delay temporal para Redis sync (opcional, quítalo después si no hace falta)
   await new Promise(resolve => setTimeout(resolve, 500));
   
   logDebug(`[DEBUG] Post-save: Verificando token ${token} en entregas...`);
   const verify = await loadPendingEntregas();  // Recarga para check
   const found = verify.find(e => e.token === token);
   if (!found) {
-    logDebug(`[ERROR] Token ${token} NO se guardó en KV!`);
+    logDebug(`[ERROR] Token ${token} NO se guardó en Redis!`);
   } else {
     logDebug(`[OK] Token ${token} guardado: expira ${new Date(found.expira).toISOString()}`);
   }
@@ -199,14 +226,14 @@ app.get('/generar-qr/:cliente/:ruta', async (req, res) => {
   });
   await savePendingEntregas(entregas);
   
-  // Delay temporal para KV sync
+  // Delay temporal para Redis sync
   await new Promise(resolve => setTimeout(resolve, 500));
   
   logDebug(`[DEBUG] Post-save: Verificando token ${token} en entregas...`);
   const verify = await loadPendingEntregas();
   const found = verify.find(e => e.token === token);
   if (!found) {
-    logDebug(`[ERROR] Token ${token} NO se guardó en KV!`);
+    logDebug(`[ERROR] Token ${token} NO se guardó en Redis!`);
   } else {
     logDebug(`[OK] Token ${token} guardado: expira ${new Date(found.expira).toISOString()}`);
   }
@@ -311,8 +338,8 @@ app.get('/debug-tokens', async (req, res) => {
 app.get('/finalizar-pdf', async (req, res) => {
   try {
     logDebug('DEBUG PDF: Iniciando');
-    const rawConfirmed = await kv.get('confirmed');
-    logDebug(`DEBUG PDF: Raw KV: ${JSON.stringify(rawConfirmed)}`);
+    const rawConfirmed = await redis.get('confirmed');
+    logDebug(`DEBUG PDF: Raw Redis: ${JSON.stringify(rawConfirmed)}`);
 
     const confirmaciones = await loadConfirmed();
     logDebug(`DEBUG PDF: Length: ${confirmaciones.length}`);
@@ -424,9 +451,14 @@ app.get('/get-entrega/:token', async (req, res) => {
 });
 
 app.delete('/borrar-logs', async (req, res) => {
-  await kv.del('confirmed');
-  logDebug('Borrado KV confirmed');
-  res.json({ ok: true, msg: 'Reiniciado' });
+  try {
+    await redis.del('confirmed');
+    logDebug('Borrado Redis confirmed');
+    res.json({ ok: true, msg: 'Reiniciado' });
+  } catch (err) {
+    logDebug(`[REDIS ERROR] Falló borrar confirmed: ${err.message}`);
+    res.status(500).json({ ok: false, msg: 'Error al borrar' });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
