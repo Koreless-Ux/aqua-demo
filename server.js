@@ -19,8 +19,8 @@ const { Redis } = require('@upstash/redis');
 
 // Inicializamos Redis con las variables que Vercel inyecta automáticamente
 const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
+  url: process.env.AQUANEW_KV_REST_API_URL || process.env.KV_REST_API_URL,  // usa el prefijo primero, fallback al genérico
+  token: process.env.AQUANEW_KV_REST_API_TOKEN || process.env.KV_REST_API_TOKEN,
   // Si en tus env vars ves UPSTASH_REDIS_REST_URL y UPSTASH_REDIS_REST_TOKEN, cámbialas por esas
 });
 
